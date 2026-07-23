@@ -1,0 +1,2780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Complexe Jeunes Gabès | Espace Membre & Administration</title>
+
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    // ==== Connexion Supabase ====
+    const SUPABASE_URL = "https://bdhxgzfqgsnbxdlfaycs.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaHhnemZxZ3NuYnhkbGZheWNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODI3NTAsImV4cCI6MjA5OTI1ODc1MH0.jBR9E5e_7cNIRRNjswOiH3oXMujiFes5nV7mRzq_LRE";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Correspondance entre les noms de clubs affichés dans le formulaire et les clubs réels en base (table "boards")
+    const CLUB_NAME_TO_BOARD = {
+      'Développement Web': 'Développement Web',
+      'Intelligence Artificielle': 'Intelligence Artificielle',
+      'Langue Allemande': 'Langue Allemande',
+      'Compétences de Vie': 'Compétences de Vie',
+      'Échecs': 'نادي الشطرنج',
+      'Animation': 'Animation',
+      'Musique': 'Musique',
+      'Activités Artistiques': 'Activités Artistiques',
+      'Activités Sportives': 'Activités Sportives',
+      'Activités Scientifiques': 'Activités Scientifiques',
+      'Activités Culturelles et de Loisirs': 'Activités Culturelles et de Loisirs'
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg-dark: #080c16;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --card-hover-border: rgba(99, 102, 241, 0.5);
+      --card-hover: rgba(99, 102, 241, 0.15);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      --accent-solid: #6366f1;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --discord-dark: #1e1f22;
+      --discord-sidebar: #2b2d31;
+      --discord-chat: #313338;
+      --trello-col: #10172a;
+      --sidebar-bg: #0f172a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; overflow-x: hidden; position: relative; }
+
+    #bgCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+    .view-page { display: none; }
+    .view-page.active { display: block; }
+
+    /* Navigation */
+    .navbar {
+      display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem;
+      max-width: 1280px; margin: 0 auto; border-bottom: 1px solid var(--card-border);
+      backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 50; background: rgba(8, 12, 22, 0.85);
+    }
+    .logo-container { display: flex; align-items: center; gap: 0.8rem; text-decoration: none; color: white; }
+    .logo-placeholder {
+      width: 44px; height: 44px; border-radius: 12px; border: 2px dashed rgba(255, 255, 255, 0.3);
+      display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.05); overflow: hidden;
+    }
+    .logo-placeholder img { width: 100%; height: 100%; object-fit: contain; }
+    .logo-text { font-weight: 800; font-size: 1.1rem; }
+    .logo-text span { display: block; font-size: 0.72rem; color: var(--text-muted); }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 0.95rem; }
+    .nav-links a:hover { color: var(--text-main); }
+    .nav-actions { display: flex; gap: 0.8rem; align-items: center; }
+
+    /* Landing Page */
+    .hero { max-width: 1280px; margin: 0 auto; padding: 4rem 2rem 2rem 2rem; text-align: center; display: flex; flex-direction: column; align-items: center; }
+    .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; border-radius: 9999px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc; font-size: 0.85rem; font-weight: 600; margin-bottom: 1.5rem; }
+    .hero-title { font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 800; line-height: 1.15; max-width: 900px; margin-bottom: 1.25rem; }
+    .text-gradient { background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .btn { display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1.5rem; border-radius: 12px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.25s ease; text-decoration: none; border: none; }
+    .btn-primary { background: var(--accent-gradient); color: white; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(168, 85, 247, 0.5); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text-main); border: 1px solid var(--card-border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+    .btn-danger { background: var(--accent-red); color: white; }
+    .btn-danger:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .section-container { max-width: 1280px; margin: 4rem auto; padding: 0 2rem; }
+    .clubs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 2rem; }
+    .club-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; overflow: hidden; backdrop-filter: blur(12px); transition: transform 0.3s ease; }
+    .club-card:hover { transform: translateY(-6px); border-color: var(--card-hover-border); }
+    .club-img { width: 100%; height: 160px; object-fit: cover; }
+    .club-emoji-banner { width: 100%; height: 130px; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25)); }
+    .club-body { padding: 1.25rem; }
+
+    .inscription-container { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; padding: 2.5rem 2rem; max-width: 750px; margin: 0 auto; backdrop-filter: blur(16px); }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; text-align: left; }
+    .form-input, .form-select, .form-textarea { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); border-radius: 12px; padding: 0.8rem 1rem; color: white; outline: none; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-select option { background: var(--bg-dark); color: white; }
+
+    .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); border-radius: 12px; padding: 0.8rem 1rem; }
+    .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+    .checkbox-item input { accent-color: var(--accent-solid); width: 16px; height: 16px; }
+
+    /* Custom Club Multi-Select ("liste déroulante") */
+    .club-select-wrapper { position: relative; width: 100%; }
+    .club-select-trigger {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); border-radius: 12px;
+      padding: 0.8rem 1rem; color: var(--text-main); cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .club-select-trigger:hover { border-color: var(--card-hover-border); background: rgba(255, 255, 255, 0.07); }
+    .club-select-trigger.open { border-color: var(--accent-solid); }
+    .club-select-trigger .chevron-icon { flex-shrink: 0; transition: transform 0.2s ease; color: var(--text-muted); }
+    .club-select-trigger.open .chevron-icon { transform: rotate(180deg); }
+    .club-select-label { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .club-select-label.has-value { color: var(--text-main); }
+    .club-select-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+    .club-select-panel {
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: #0f172a;
+      border: 1px solid var(--card-border); border-radius: 14px; padding: 0.5rem;
+      max-height: 280px; overflow-y: auto; box-shadow: 0 20px 45px -10px rgba(0,0,0,0.6);
+      z-index: 60; display: none; flex-direction: column; gap: 0.15rem;
+    }
+    .club-select-panel.open { display: flex; }
+    .club-select-option {
+      display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0.7rem; border-radius: 8px;
+      cursor: pointer; font-size: 0.88rem; color: var(--text-main); transition: background 0.15s ease;
+    }
+    .club-select-option:hover { background: rgba(99, 102, 241, 0.15); }
+    .club-select-option input { accent-color: var(--accent-solid); width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 200; }
+    .modal-overlay.open { display: flex; }
+    .modal-card { background: #0f172a; border: 1px solid var(--card-border); padding: 2rem; border-radius: 20px; width: 100%; max-width: 450px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+
+    /* Workspace */
+    .workspace-layout { display: grid; grid-template-columns: 240px 1fr; height: 100vh; background: var(--discord-dark); overflow: hidden; }
+    .workspace-layout.no-sidebar { grid-template-columns: 1fr; }
+    .workspace-layout.no-sidebar .discord-sidebar { display: none; }
+    .discord-sidebar { background: var(--discord-sidebar); border-right: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; position: relative; }
+    .server-header { padding: 1.2rem; border-bottom: 1px solid rgba(0, 0, 0, 0.2); font-weight: 800; font-size: 1rem; display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.15); position: relative; }
+    
+    .settings-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.3rem; border-radius: 6px; transition: background 0.2s, color 0.2s; }
+    .settings-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+
+    /* Notifications */
+    .notif-btn { position: relative; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.3rem; border-radius: 6px; transition: background 0.2s, color 0.2s; }
+    .notif-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+    .notif-badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 9999px; background: var(--accent-red); color: white; font-size: 0.62rem; font-weight: 800; display: none; align-items: center; justify-content: center; line-height: 1; border: 2px solid var(--discord-sidebar); }
+    .notif-badge.show { display: flex; }
+    .channel-item { position: relative; }
+    .channel-item .unread-dot { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: var(--accent-red); display: none; }
+    .channel-item.has-unread .unread-dot { display: block; }
+    .notif-permission-banner {
+      position: fixed; bottom: 20px; left: 20px; z-index: 1100; background: var(--card-bg); border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px); border-radius: 14px; padding: 0.9rem 1.1rem; max-width: 320px; box-shadow: 0 15px 35px -10px rgba(0,0,0,0.6);
+      display: none; align-items: flex-start; gap: 0.7rem;
+    }
+    .notif-permission-banner.show { display: flex; }
+    .notif-permission-banner i { color: var(--accent-solid); flex-shrink: 0; margin-top: 0.1rem; }
+    .notif-permission-banner .npb-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+    .notif-permission-banner .npb-actions button { flex: 1; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+    
+    .settings-dropdown {
+      position: absolute; top: 52px; right: 12px; background: #182238; border: 1px solid var(--card-border);
+      border-radius: 12px; width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; display: none; flex-direction: column; overflow: hidden;
+    }
+    .settings-dropdown.active { display: flex; }
+    .dropdown-item { padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.6rem; color: var(--text-main); font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; border: none; background: transparent; text-align: left; width: 100%; }
+    .dropdown-item:hover { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+    .dropdown-item.danger { color: #f87171; border-top: 1px solid var(--card-border); }
+    .dropdown-item.danger:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    .channel-list { padding: 1rem 0.5rem; flex: 1; overflow-y: auto; }
+
+    /* Recherche de membres */
+    .member-search-wrapper { position: relative; padding: 0.8rem 0.8rem 0; }
+    .member-search-box {
+      display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.5rem 0.7rem; margin-bottom: 0.4rem;
+    }
+    .member-search-box input {
+      background: transparent; border: none; outline: none; color: var(--text-main); font-size: 0.85rem; width: 100%;
+    }
+    .member-search-box input::placeholder { color: #6b7280; }
+    .member-search-club-filter {
+      width: 100%; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+      padding: 0.4rem 0.6rem; color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.3rem; outline: none;
+    }
+    .member-search-club-filter option { background: #1a2033; color: white; }
+    .member-search-results {
+      position: absolute; top: 100%; left: 0.8rem; right: 0.8rem; background: #182238;
+      border: 1px solid var(--card-border); border-radius: 10px; max-height: 280px; overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5); z-index: 80; display: none; flex-direction: column;
+    }
+    .member-search-results.open { display: flex; }
+    .member-search-result-item {
+      display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.7rem; cursor: pointer; transition: background 0.15s ease;
+    }
+    .member-search-result-item:hover { background: rgba(99, 102, 241, 0.15); }
+    .member-search-result-name { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+    .member-search-result-meta { font-size: 0.72rem; color: var(--text-muted); }
+    .member-search-empty { padding: 0.8rem 0.7rem; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+
+    /* Éléments cliquables pour ouvrir un profil */
+    .clickable-profile { cursor: pointer; transition: opacity 0.15s ease; }
+    .clickable-profile:hover { opacity: 0.8; }
+    .chat-msg-author.clickable-profile:hover { text-decoration: underline; }
+    .channel-category { font-size: 0.72rem; font-weight: 700; color: #80848e; text-transform: uppercase; padding: 0.5rem; }
+    
+    .channel-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.8rem; border-radius: 8px; color: #949ba4; cursor: pointer; font-size: 0.9rem; margin-bottom: 0.2rem; transition: background 0.2s, color 0.2s; }
+    .channel-item:hover, .channel-item.active { background: rgba(255, 255, 255, 0.07); color: #f2f3f5; }
+
+    .user-profile-bar { padding: 0.8rem; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: space-between; }
+    .user-info { display: flex; align-items: center; gap: 0.6rem; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; overflow: hidden; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .workspace-main { display: flex; flex-direction: column; background: var(--discord-chat); overflow: hidden; }
+    .workspace-nav { height: 56px; border-bottom: 1px solid rgba(0,0,0,0.2); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.1); }
+    .tab-switcher { display: flex; gap: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.3rem; border-radius: 10px; }
+    .tab-btn { padding: 0.4rem 1rem; border-radius: 8px; border: none; background: transparent; color: #949ba4; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+    .tab-btn.active { background: var(--accent-solid); color: white; }
+
+    .tab-content { flex: 1; display: none; overflow: hidden; }
+    .tab-content.active { display: flex; }
+
+    /* Chat & Images */
+    .chat-container { flex: 1; display: flex; flex-direction: column; height: 100%; }
+    .chat-messages-area { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+    .chat-msg { display: flex; gap: 0.8rem; align-items: flex-start; position: relative; }
+    .chat-msg-body { background: rgba(255,255,255,0.03); padding: 0.6rem 1rem; border-radius: 10px; max-width: 80%; }
+    .chat-msg-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+    .chat-msg-author { font-size: 0.88rem; font-weight: 700; color: #818cf8; }
+
+    .btn-del-msg { background: none; border: none; color: #f87171; cursor: pointer; opacity: 0; transition: opacity 0.2s; padding: 0.2rem; }
+    .chat-msg:hover .btn-del-msg { opacity: 1; }
+
+    .role-badge { font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 700; text-transform: uppercase; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; }
+    .role-badge.admin { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+
+    .chat-img-embed { max-width: 100%; max-height: 280px; border-radius: 8px; margin-top: 0.5rem; border: 1px solid var(--card-border); display: block; }
+
+    .chat-input-bar { padding: 1rem 1.5rem; background: rgba(0,0,0,0.2); display: flex; gap: 0.8rem; align-items: center; }
+    .chat-input-field { flex: 1; background: rgba(255,255,255,0.07); border: none; padding: 0.8rem 1rem; border-radius: 10px; color: white; outline: none; }
+
+    /* Trello Board */
+    .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; }
+    .kanban-col { width: 300px; min-width: 300px; background: var(--trello-col); border: 1px solid var(--card-border); border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; max-height: 100%; }
+    .kanban-header { font-weight: 700; font-size: 0.95rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .kanban-cards { display: flex; flex-direction: column; gap: 0.8rem; overflow-y: auto; flex: 1; min-height: 50px; }
+    
+    .kanban-card { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 0.9rem; border-radius: 10px; position: relative; transition: background 0.2s, border-color 0.2s, transform 0.2s; cursor: grab; }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+    .card-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 4px; }
+    .kanban-card:hover .card-actions { display: flex; }
+    .card-btn { background: rgba(0,0,0,0.5); border: none; color: #94a3b8; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .card-btn:hover { color: white; background: rgba(255,255,255,0.2); }
+    .card-btn.delete:hover { color: #f87171; background: rgba(239, 68, 68, 0.2); }
+
+    .card-tag { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(99, 102, 241, 0.3); color: #a5b4fc; display: inline-block; margin-bottom: 0.4rem; }
+    .add-card-btn { margin-top: 0.8rem; background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--card-border); color: var(--text-muted); padding: 0.6rem; border-radius: 8px; cursor: pointer; text-align: center; font-size: 0.85rem; font-weight: 600; }
+    .add-card-btn:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+
+    /* Profile Modal & Instagram Grid */
+    .profile-card { max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; }
+    .profile-header-area { display: flex; gap: 1.5rem; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+    .profile-avatar-upload { width: 85px; height: 85px; border-radius: 50%; background: var(--accent-gradient); position: relative; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: 800; cursor: pointer; overflow: hidden; border: 2px solid var(--accent-solid); }
+    .profile-avatar-upload img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-avatar-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; color: white; }
+    .profile-avatar-upload:hover .profile-avatar-overlay { opacity: 1; }
+
+    .insta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: 0.8rem; }
+    .insta-item { aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); position: relative; cursor: pointer; }
+    .insta-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+    .insta-item:hover img { transform: scale(1.08); }
+
+    .club-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; border-radius: 20px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; font-size: 0.82rem; font-weight: 600; margin-right: 0.4rem; margin-bottom: 0.4rem; }
+    
+    .status-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; }
+    .status-badge.paid { background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+
+    /* Admin Panel Styles */
+    .lock-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 12, 22, 0.95); backdrop-filter: blur(16px);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .lock-card {
+      background: var(--sidebar-bg); border: 1px solid var(--card-border);
+      border-radius: 20px; padding: 2.5rem; max-width: 420px; width: 90%;
+      text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+    }
+    .lock-icon {
+      width: 60px; height: 60px; border-radius: 50%; background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4); color: var(--accent-red);
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem auto;
+    }
+
+    .admin-layout { display: flex; min-height: 100vh; flex: 1; }
+    .admin-sidebar {
+      width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--card-border);
+      padding: 1.5rem 1rem; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .brand-header { display: flex; align-items: center; gap: 0.8rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); }
+    .admin-badge { font-size: 0.65rem; background: var(--accent-red); color: white; padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 800; text-transform: uppercase; }
+
+    .nav-menu { list-style: none; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 1rem; border-radius: 12px;
+      color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .nav-item:hover, .nav-item.active { background: var(--card-hover); color: var(--text-main); }
+    .nav-item.active { border-left: 3px solid var(--accent-red); }
+
+    .admin-main { flex: 1; padding: 2rem; overflow-y: auto; background: rgba(0, 0, 0, 0.2); }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+    .stat-card {
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px;
+      padding: 1.25rem; display: flex; align-items: center; gap: 1rem; backdrop-filter: blur(12px);
+    }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+    .admin-section { display: none; }
+    .admin-section.active { display: block; }
+
+    .panel-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; padding: 1.5rem; backdrop-filter: blur(12px); margin-bottom: 1.5rem; }
+
+    .data-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .data-table th, .data-table td { padding: 0.85rem 1rem; text-align: left; border-bottom: 1px solid var(--card-border); font-size: 0.88rem; }
+    .data-table th { color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; }
+
+    .admin-direct-chat { display: flex; flex-direction: column; height: 380px; background: rgba(0,0,0,0.3); border-radius: 12px; overflow: hidden; border: 1px solid var(--card-border); }
+    .admin-chat-feed { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; }
+    .admin-chat-input-bar { display: flex; padding: 0.8rem; background: rgba(0,0,0,0.2); gap: 0.6rem; }
+
+    .msg-item { position: relative; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
+
+    .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .media-card { background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; position: relative; }
+    .media-card img { width: 100%; height: 130px; object-fit: cover; }
+    .media-info { padding: 0.6rem; display: flex; justify-content: space-between; align-items: center; }
+
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 0.8rem 1.2rem; border-radius: 10px; font-weight: 600; box-shadow: 0 10px 20px rgba(0,0,0,0.4); display: none; z-index: 1100; }
+  </style>
+</head>
+<body>
+
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- PAGE 1: ACCUEIL ET INSCRIPTION (INDEX) -->
+  <div id="landingView" class="view-page active">
+    <nav class="navbar">
+      <a href="#" class="logo-container">
+        <div class="logo-placeholder">
+          <img src="logo.png" alt="Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <span style="display:none; font-size:0.6rem; color:var(--text-muted);">LOGO</span>
+        </div>
+        <div class="logo-text">CJ Gabès <span>المركب الشبابي قابس</span></div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#clubs">Clubs</a></li>
+        <li><a href="#inscription">Inscription</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="btn btn-secondary" onclick="openLoginModal()">Se connecter</button>
+        <button class="btn btn-primary" onclick="scrollToInscription()">S'inscrire</button>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="badge"><i data-lucide="sparkles" style="width:14px;"></i> Espace Jeunesse Gabès</div>
+      <h1 class="hero-title">Rejoignez l'Espace Collaboratif du <span class="text-gradient">Complexe Jeunes Gabès</span></h1>
+      <p style="color:var(--text-muted); max-width:600px; margin-bottom:2rem;">
+        Inscrivez-vous pour échanger, partager vos photos et gérer les tâches Trello de votre club.
+      </p>
+      <div style="display:flex; gap:1rem;">
+        <button class="btn btn-primary" onclick="scrollToInscription()">Commencer maintenant</button>
+        <button class="btn btn-secondary" onclick="openLoginModal()">J'ai déjà un compte</button>
+      </div>
+    </header>
+
+    <section class="section-container" id="clubs">
+      <h2 style="font-size:1.8rem; font-weight:800; margin-bottom:1.5rem; text-align:center;">Nos Clubs</h2>
+      <div class="clubs-grid">
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/5483075/pexels-photo-5483075.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Développement Web" loading="lazy">
+          <div class="club-body">
+            <h3>Développement Web</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">HTML, CSS, JavaScript et création de projets web.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Développement Web')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Intelligence Artificielle" loading="lazy">
+          <div class="club-body">
+            <h3>Intelligence Artificielle (IA)</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Machine learning, projets IA et automatisation.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Intelligence Artificielle')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/12782140/pexels-photo-12782140.png?auto=compress&cs=tinysrgb&w=600" alt="Langue Allemande - Drapeau allemand" loading="lazy">
+          <div class="club-body">
+            <h3>Langue Allemande</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Cours et ateliers de conversation en allemand.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Langue Allemande')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/8364639/pexels-photo-8364639.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Compétences de Vie" loading="lazy">
+          <div class="club-body">
+            <h3>Compétences de Vie (Life Skills)</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Développement personnel et compétences pratiques.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Compétences de Vie')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/4576336/pexels-photo-4576336.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Échecs" loading="lazy">
+          <div class="club-body">
+            <h3>Club d'Échecs (Chess Club)</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Entraînements, stratégie et tournois inter-clubs.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Échecs')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/7991186/pexels-photo-7991186.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Animation" loading="lazy">
+          <div class="club-body">
+            <h3>Animation</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Théâtre, jeux de rôle et animation de groupe.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Animation')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/7095718/pexels-photo-7095718.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Musique" loading="lazy">
+          <div class="club-body">
+            <h3>Musique</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Instruments, chant et ateliers musicaux.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Musique')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/35243021/pexels-photo-35243021.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Activités Artistiques" loading="lazy">
+          <div class="club-body">
+            <h3>Activités Artistiques</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Dessin, peinture et arts créatifs.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Activités Artistiques')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/35481332/pexels-photo-35481332.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Activités Sportives" loading="lazy">
+          <div class="club-body">
+            <h3>Activités Sportives</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Sports collectifs, entraînements et tournois.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Activités Sportives')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/8471835/pexels-photo-8471835.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Activités Scientifiques" loading="lazy">
+          <div class="club-body">
+            <h3>Activités Scientifiques</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Expériences, projets et découvertes scientifiques.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Activités Scientifiques')">Rejoindre</button>
+          </div>
+        </div>
+        <div class="club-card">
+          <img class="club-img" src="https://images.pexels.com/photos/7624979/pexels-photo-7624979.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Activités Culturelles et de Loisirs" loading="lazy">
+          <div class="club-body">
+            <h3>Activités Culturelles et de Loisirs</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.5rem 0 1rem 0;">Sorties, culture et activités de détente.</p>
+            <button class="btn btn-secondary" style="width:100%;" onclick="quickRegister('Activités Culturelles et de Loisirs')">Rejoindre</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-container" id="inscription">
+      <div class="inscription-container">
+        <h2 style="font-size:1.8rem; font-weight:800; text-align:center;">Formulaire d'Inscription</h2>
+        <p style="color:var(--text-muted); text-align:center; font-size:0.9rem;">Créez votre profil avec rôle pour rejoindre vos clubs.</p>
+
+        <form onsubmit="handleRegisterSubmit(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nom & Prénom</label>
+              <input type="text" id="regName" class="form-input" placeholder="Ex: Mohamed Ali" required />
+            </div>
+            <div class="form-group">
+              <label>Adresse Email</label>
+              <input type="email" id="regEmail" class="form-input" placeholder="nom@exemple.com" required />
+            </div>
+            <div class="form-group">
+              <label>Mot de passe</label>
+              <input type="password" id="regPassword" class="form-input" placeholder="6 caractères minimum" minlength="6" required />
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Choix des Clubs (Sélection multiple possible)</label>
+              <div class="club-select-wrapper" id="clubSelectWrapper">
+                <button type="button" class="club-select-trigger" id="clubSelectTrigger" onclick="toggleClubDropdown(event)">
+                  <span class="club-select-label" id="clubSelectLabel">Sélectionnez vos clubs</span>
+                  <i data-lucide="chevron-down" style="width:18px;" class="chevron-icon"></i>
+                </button>
+                <div class="club-select-panel" id="clubSelectPanel">
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Développement Web" onchange="updateClubSelectLabel()"> Développement Web
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Intelligence Artificielle" onchange="updateClubSelectLabel()"> Intelligence Artificielle (IA)
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Langue Allemande" onchange="updateClubSelectLabel()"> Langue Allemande
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Compétences de Vie" onchange="updateClubSelectLabel()"> Compétences de Vie (Life Skills)
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Échecs" onchange="updateClubSelectLabel()"> Club d'Échecs (Chess Club)
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Animation" onchange="updateClubSelectLabel()"> Animation
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Musique" onchange="updateClubSelectLabel()"> Musique
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Activités Artistiques" onchange="updateClubSelectLabel()"> Activités Artistiques
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Activités Sportives" onchange="updateClubSelectLabel()"> Activités Sportives
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Activités Scientifiques" onchange="updateClubSelectLabel()"> Activités Scientifiques
+                  </label>
+                  <label class="club-select-option">
+                    <input type="checkbox" name="regClubs" value="Activités Culturelles et de Loisirs" onchange="updateClubSelectLabel()"> Activités Culturelles et de Loisirs
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Rôle dans le club</label>
+              <select id="regRole" class="form-select" required>
+                <option value="Membre">Membre</option>
+                <option value="Développeur">Développeur</option>
+                <option value="Organisateur">Organisateur</option>
+                <option value="Président">Président / Chef de projet</option>
+                <option value="Designer">Designer UI/UX</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mot de passe</label>
+              <input type="password" id="regPass" class="form-input" placeholder="••••••••" required />
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1.5rem; justify-content:center;">Accéder à mon Espace Membre</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <!-- PAGE 2: ESPACE DE TRAVAIL HYBRIDE (WORKSPACE) -->
+  <div id="workspaceView" class="view-page">
+    <div class="workspace-layout" id="workspaceLayout">
+      
+      <!-- SIDEBAR WORKSPACE -->
+      <aside class="discord-sidebar">
+        <div class="server-header">
+          <span id="wsClubTitle">Club Développement Web</span>
+          <div style="display:flex; align-items:center; gap:0.2rem;">
+            <button class="notif-btn" id="notifBellBtn" title="Notifications" onclick="handleNotifBellClick()">
+              <i data-lucide="bell" style="width:18px;"></i>
+              <span class="notif-badge" id="notifBadge">0</span>
+            </button>
+            <button class="settings-btn" id="settingsToggleBtn" title="Paramètres">
+              <i data-lucide="settings" style="width:18px;"></i>
+            </button>
+          </div>
+
+          <!-- Dropdown Paramètres -->
+          <div class="settings-dropdown" id="settingsDropdown">
+            <button class="dropdown-item" onclick="openProfileModal()">
+              <i data-lucide="user" style="width:16px;"></i> Mon Profil
+            </button>
+            <button class="dropdown-item danger" onclick="logout()">
+              <i data-lucide="log-out" style="width:16px;"></i> Se déconnecter
+            </button>
+          </div>
+        </div>
+
+        <div class="member-search-wrapper" id="memberSearchWrapper">
+          <div class="member-search-box">
+            <i data-lucide="search" style="width:15px; color:var(--text-muted); flex-shrink:0;"></i>
+            <input type="text" id="memberSearchInput" placeholder="Rechercher un membre..." autocomplete="off" oninput="handleMemberSearch()" onfocus="handleMemberSearch()" />
+          </div>
+          <select id="memberSearchClubFilter" class="member-search-club-filter" onchange="handleMemberSearch()"></select>
+          <div class="member-search-results" id="memberSearchResults"></div>
+        </div>
+
+        <div class="channel-list">
+          <div class="channel-category">Salons Textuels</div>
+          <div id="channelContainer"></div>
+
+          <div class="channel-category">Messages Directs</div>
+          <div id="dmContainer"></div>
+        </div>
+
+        <div class="user-profile-bar">
+          <div class="user-info">
+            <div class="avatar" id="userAvatar">T</div>
+            <div>
+              <div style="font-size:0.85rem; font-weight:700;" id="userNameDisplay">tayssir</div>
+              <div style="font-size:0.7rem; color:#a855f7; font-weight:600;" id="userRoleDisplay">Développeur</div>
+            </div>
+          </div>
+          <button onclick="logout()" title="Déconnexion" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">
+            <i data-lucide="log-out" style="width:18px;"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- CONTENU PRINCIPAL DU WORKSPACE -->
+      <main class="workspace-main">
+        <div class="workspace-nav">
+          <div style="display:flex; align-items:center; gap:0.5rem; font-weight:700;">
+            <i data-lucide="hash" style="color:#818cf8;"></i>
+            <span id="currentChannelHeader">general</span>
+          </div>
+
+          <div class="tab-switcher">
+            <button class="tab-btn active" id="btnTabChat" onclick="switchTab('chat')">
+              <i data-lucide="message-square" style="width:14px; display:inline; vertical-align:middle;"></i> Discussion
+            </button>
+            <button class="tab-btn" id="btnTabBoard" onclick="switchTab('board')">
+              <i data-lucide="kanban" style="width:14px; display:inline; vertical-align:middle;"></i> Trello Board
+            </button>
+            <button class="tab-btn" id="btnTabGallery" onclick="switchTab('gallery')">
+              <i data-lucide="image" style="width:14px; display:inline; vertical-align:middle;"></i> Galerie
+            </button>
+          </div>
+        </div>
+
+        <!-- ONGLET 1: CHAT DISCORD -->
+        <div class="tab-content active" id="tabChat">
+          <div class="chat-container">
+            <div class="chat-messages-area" id="chatFeed"></div>
+
+            <div class="chat-input-bar">
+              <input type="file" id="imageUploader" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)" />
+              <button class="btn btn-secondary" onclick="document.getElementById('imageUploader').click()" title="Envoyer une photo" style="padding:0.7rem;"><i data-lucide="image" style="width:18px;"></i></button>
+              <input type="text" class="chat-input-field" id="wsChatInput" placeholder="Envoyer un message ou coller un lien image..." onkeypress="handleWsChatKey(event)" />
+              <button class="btn btn-primary" onclick="sendWsMessage()"><i data-lucide="send" style="width:16px;"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ONGLET 2: TABLEAU KANBAN (TRELLO) -->
+        <div class="tab-content" id="tabBoard">
+          <div class="kanban-board">
+            <div class="kanban-col">
+              <div class="kanban-header">
+                <span> À FAIRE</span>
+                <span style="font-size:0.75rem; color:var(--text-muted);" id="countTodo">0</span>
+              </div>
+              <div class="kanban-cards" id="colTodo"></div>
+              <button class="add-card-btn" onclick="addNewCard('colTodo')">+ Ajouter une carte</button>
+            </div>
+
+            <div class="kanban-col">
+              <div class="kanban-header">
+                <span> EN COURS</span>
+                <span style="font-size:0.75rem; color:var(--text-muted);" id="countProgress">0</span>
+              </div>
+              <div class="kanban-cards" id="colProgress"></div>
+              <button class="add-card-btn" onclick="addNewCard('colProgress')">+ Ajouter une carte</button>
+            </div>
+
+            <div class="kanban-col">
+              <div class="kanban-header">
+                <span> TERMINÉ</span>
+                <span style="font-size:0.75rem; color:var(--text-muted);" id="countDone">0</span>
+              </div>
+              <div class="kanban-cards" id="colDone"></div>
+              <button class="add-card-btn" onclick="addNewCard('colDone')">+ Ajouter une carte</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ONGLET 3: GALERIE -->
+        <div class="tab-content" id="tabGallery">
+          <div style="flex:1; display:flex; flex-direction:column; padding:1.5rem; overflow-y:auto;">
+            <div style="margin-bottom:2rem;">
+              <h3 style="font-size:1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                <i data-lucide="upload-cloud" style="color:#818cf8;"></i> Soumettre une Photo à la Galerie
+              </h3>
+              <div style="background: rgba(99, 102, 241, 0.1); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius:12px; padding:1.5rem;">
+                <input type="file" id="galleryFileInput" accept="image/*" style="display:none;" onchange="prepareGalleryUpload(event)" />
+                <button class="btn btn-primary" onclick="document.getElementById('galleryFileInput').click()" style="justify-content:center; margin-bottom:1rem;">
+                  <i data-lucide="image" style="width:18px;"></i> Choisir une photo
+                </button>
+                <p style="color:var(--text-muted); font-size:0.8rem;">Les photos seront visibles après approbation de l'administrateur</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="font-size:1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                <i data-lucide="star" style="color:#f59e0b;"></i> Galerie Approuvée
+              </h3>
+              <div class="media-grid" id="memberGalleryGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:1rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- IMAGE LIGHTBOX MODAL -->
+        <div class="modal-overlay" id="galleryLightbox">
+          <div style="position:relative; max-width:90%; max-height:90vh; display:flex; flex-direction:column; background:var(--card-bg); border:1px solid var(--card-border); border-radius:16px; overflow:hidden;">
+            <div style="display:flex; gap:0.5rem; position:absolute; top:1rem; right:1rem; z-index:10;">
+              <button onclick="downloadGalleryPhoto()" style="background:rgba(0,0,0,0.5); border:none; color:white; width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" title="Télécharger la photo"><i data-lucide="download" style="width:20px;"></i></button>
+              <button onclick="closeGalleryLightbox()" style="background:rgba(0,0,0,0.5); border:none; color:white; width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" title="Fermer"><i data-lucide="x" style="width:20px;"></i></button>
+            </div>
+            <img id="lightboxImage" src="" alt="" style="max-width:100%; max-height:70vh; object-fit:contain; background:rgba(0,0,0,0.3);" />
+            <div style="padding:1rem; border-top:1px solid var(--card-border);">
+              <p id="lightboxDescription" style="color:var(--text-muted); font-size:0.9rem; line-height:1.5;"></p>
+              <p id="lightboxAuthor" style="color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem;"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- GALLERY DESCRIPTION MODAL -->
+        <div class="modal-overlay" id="galleryDescModal">
+          <div class="modal-card" style="max-width:500px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+              <h3 style="font-size:1.2rem; font-weight:800;">Ajouter une Description</h3>
+              <button onclick="closeDescModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div style="margin-bottom:1rem;">
+              <img id="descPreviewImg" src="" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; border:1px solid var(--card-border);" />
+            </div>
+            <div class="form-group">
+              <label style="font-size:0.9rem; color:var(--text-muted);">Club ou Complexe</label>
+              <select id="galleryClubSelect" class="form-select">
+                <option value="all"> Pour tout le Complexe</option>
+                <option value="Développement Web"> Développement Web</option>
+                <option value="Intelligence Artificielle"> Intelligence Artificielle (IA)</option>
+                <option value="Langue Allemande"> Langue Allemande</option>
+                <option value="Compétences de Vie"> Compétences de Vie (Life Skills)</option>
+                <option value="Échecs"> Club d'Échecs (Chess Club)</option>
+                <option value="Animation"> Animation</option>
+                <option value="Musique"> Musique</option>
+                <option value="Activités Artistiques"> Activités Artistiques</option>
+                <option value="Activités Sportives"> Activités Sportives</option>
+                <option value="Activités Scientifiques"> Activités Scientifiques</option>
+                <option value="Activités Culturelles et de Loisirs"> Activités Culturelles et de Loisirs</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label style="font-size:0.9rem; color:var(--text-muted);">Description (optionnelle)</label>
+              <textarea id="galleryDescInput" class="form-textarea" placeholder="Décrivez votre photo..." style="resize:vertical; min-height:80px;"></textarea>
+            </div>
+            <div style="display:flex; gap:0.8rem;">
+              <button class="btn btn-primary" style="flex:1; justify-content:center;" onclick="confirmGalleryUpload()">Publier la photo</button>
+              <button class="btn btn-secondary" style="flex:1; justify-content:center;" onclick="closeDescModal()">Annuler</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- PAGE 3: PANNEAU D'ADMINISTRATION (ADMIN PAGE) -->
+  <div id="adminView" class="view-page">
+    <!-- ECRAN DE VERROUILLAGE SÉCURISÉ -->
+    <div class="lock-overlay" id="lockOverlay">
+      <div class="lock-card">
+        <div class="lock-icon"><i data-lucide="shield-alert" style="width:28px; height:28px;"></i></div>
+        <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem;">Accès Restreint</h2>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Veuillez saisir le code secret d'administration.</p>
+
+        <form onsubmit="verifyAdminPasscode(event)">
+          <div class="form-group">
+            <input type="password" id="adminPasscodeInput" class="form-input" placeholder="Entrez le code secret..." style="text-align:center; font-size:1rem; letter-spacing:2px;" autofocus required />
+          </div>
+          <p id="authError" style="color:var(--accent-red); font-size:0.8rem; display:none; margin-bottom:1rem;">Code incorrect ! Veuillez réessayer.</p>
+          <button type="submit" class="btn btn-danger" style="width:100%;">Déverrouiller l'Administration</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DISPOSITION PRINCIPALE D'ADMINISTRATION -->
+    <div class="admin-layout">
+      <!-- SIDEBAR ADMIN -->
+      <aside class="admin-sidebar">
+        <div>
+          <div class="brand-header">
+            <i data-lucide="shield-check" style="color:var(--accent-red); width:28px; height:28px;"></i>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem;">CJ Gabès <span class="admin-badge">ADMIN</span></div>
+              <div style="font-size:0.7rem; color:var(--text-muted);">Panneau de Gestion</div>
+            </div>
+          </div>
+
+          <ul class="nav-menu">
+            <li class="nav-item active" onclick="switchSection('sec-overview', this)">
+              <i data-lucide="layout-dashboard" style="width:18px;"></i> Vue d'ensemble
+            </li>
+            <li class="nav-item" onclick="switchSection('sec-direct-chat', this)">
+              <i data-lucide="message-circle" style="width:18px;"></i> Chat Direct Utilisateurs
+            </li>
+            <li class="nav-item" onclick="switchSection('sec-channels', this)">
+              <i data-lucide="hash" style="width:18px;"></i> Salons & Messages
+            </li>
+            <li class="nav-item" onclick="switchSection('sec-media', this)">
+              <i data-lucide="image" style="width:18px;"></i> Gestionnaire Média
+            </li>
+            <li class="nav-item" onclick="switchSection('sec-users', this)">
+              <i data-lucide="users" style="width:18px;"></i> Membres du Club
+            </li>
+          </ul>
+        </div>
+
+        <div style="border-top:1px solid var(--card-border); padding-top:1rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <button onclick="closeAdminPanel()" class="btn btn-secondary" style="width:100%; justify-content:flex-start;">
+            <i data-lucide="arrow-left" style="width:16px;"></i> Quitter Administration
+          </button>
+          <button onclick="lockAdminSession()" class="btn btn-danger" style="width:100%; justify-content:flex-start;">
+            <i data-lucide="lock" style="width:16px;"></i> Verrouiller la session
+          </button>
+        </div>
+      </aside>
+
+      <!-- CONTENU PRINCIPAL DE L'ADMINISTRATION -->
+      <main class="admin-main">
+        <div class="page-header">
+          <div>
+            <h1 style="font-size:1.6rem; font-weight:800;" id="sectionTitle">Tableau de Bord</h1>
+            <p style="color:var(--text-muted); font-size:0.85rem;">Administration système du Complexe Jeunes Gabès</p>
+          </div>
+          <button class="btn btn-primary" onclick="refreshAdminData()"><i data-lucide="refresh-cw" style="width:16px;"></i> Actualiser les données</button>
+        </div>
+
+        <!-- BARRE DE STATISTIQUES -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(99, 102, 241, 0.15); color:#818cf8;"><i data-lucide="message-square"></i></div>
+            <div>
+              <div style="font-size:1.4rem; font-weight:800;" id="statMessages">0</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Messages postés</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(168, 85, 247, 0.15); color:#c084fc;"><i data-lucide="hash"></i></div>
+            <div>
+              <div style="font-size:1.4rem; font-weight:800;" id="statChannels">0</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Salons de discussion</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(236, 72, 153, 0.15); color:#f472b6;"><i data-lucide="image"></i></div>
+            <div>
+              <div style="font-size:1.4rem; font-weight:800;" id="statMedia">0</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Fichiers média stockés</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 1: VUE D'ENSEMBLE -->
+        <div class="admin-section active" id="sec-overview">
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+              <i data-lucide="megaphone" style="color:var(--accent-purple);"></i> Publier une Annonce Officielle Admin
+            </h3>
+            <form onsubmit="postAdminAnnouncement(event)">
+              <div class="form-group">
+                <label style="font-size:0.8rem; color:var(--text-muted);">Salon de destination</label>
+                <select id="announcementChannelSelect" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label style="font-size:0.8rem; color:var(--text-muted);">Message de l'Annonce</label>
+                <textarea id="announcementText" class="form-textarea" placeholder="Rédigez l'annonce officielle ici..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-danger"><i data-lucide="send" style="width:16px;"></i> Publier l'Annonce</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SECTION 2: CHAT DIRECT PRIVÉ AVEC UN UTILISATEUR -->
+        <div class="admin-section" id="sec-direct-chat">
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
+              <i data-lucide="message-circle" style="color:#818cf8;"></i> Conversations Secrètes avec les Utilisateurs
+            </h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">Sélectionnez un utilisateur pour lui répondre en privé.</p>
+            
+            <div class="form-group">
+              <label style="font-size:0.8rem; color:var(--text-muted);">Sélectionner un Utilisateur :</label>
+              <select id="directUserSelect" class="form-select" onchange="refreshAdminData()"></select>
+            </div>
+
+            <div class="admin-direct-chat">
+              <div class="admin-chat-feed" id="adminDirectFeed"></div>
+              <div class="admin-chat-input-bar">
+                <input type="text" id="adminDirectInput" class="form-input" placeholder="Répondre en secret..." style="flex:1;" onkeypress="handleAdminDirectKey(event)" />
+                <button class="btn btn-danger" onclick="sendAdminDirectMessage()"><i data-lucide="send" style="width:16px;"></i> Envoyer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: GESTION DES SALONS & MESSAGES -->
+        <div class="admin-section" id="sec-channels">
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Créer un Nouveau Salon</h3>
+            <form onsubmit="createNewChannel(event)" style="display:flex; gap:1rem;">
+              <input type="text" id="newChannelName" class="form-input" placeholder="ex: atelier-robotique" style="flex:1;" required />
+              <select id="newChannelClub" class="form-select" style="max-width:220px;">
+                <option value="Tous"> Tous les clubs</option>
+                <option value="Développement Web"> Développement Web</option>
+                <option value="Intelligence Artificielle"> Intelligence Artificielle (IA)</option>
+                <option value="Langue Allemande"> Langue Allemande</option>
+                <option value="Compétences de Vie"> Compétences de Vie (Life Skills)</option>
+                <option value="Échecs"> Club d'Échecs (Chess Club)</option>
+                <option value="Animation"> Animation</option>
+                <option value="Musique"> Musique</option>
+                <option value="Activités Artistiques"> Activités Artistiques</option>
+                <option value="Activités Sportives"> Activités Sportives</option>
+                <option value="Activités Scientifiques"> Activités Scientifiques</option>
+                <option value="Activités Culturelles et de Loisirs"> Activités Culturelles et de Loisirs</option>
+              </select>
+              <button type="submit" class="btn btn-primary"><i data-lucide="plus" style="width:16px;"></i> Créer le salon</button>
+            </form>
+          </div>
+
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Liste des Salons Actifs</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nom du Salon</th>
+                  <th>Club Concerné</th>
+                  <th>Nombre de Messages</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="channelsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+
+        <!-- SECTION 4: GESTIONNAIRE MÉDIA & PHOTOS -->
+        <div class="admin-section" id="sec-media">
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+              <i data-lucide="upload-cloud" style="color:#6366f1;"></i> Importer des Photos & Fichiers
+            </h3>
+            <input type="file" id="mediaFileInput" accept="image/*" style="display:none;" onchange="uploadAdminMedia(event)" />
+            <button class="btn btn-secondary" onclick="document.getElementById('mediaFileInput').click()">
+              <i data-lucide="image" style="width:18px;"></i> Sélectionner un fichier image
+            </button>
+          </div>
+
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">Galerie Média Complète (Diffusée sur le site)</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted);">Toutes les photos téléversées s'affichent automatiquement à l'accueil du site.</p>
+
+            <div class="media-grid" id="adminMediaGrid"></div>
+          </div>
+        </div>
+
+        <!-- SECTION 5: ROSTER MEMBRES ET COTISATIONS -->
+        <div class="admin-section" id="sec-users">
+          <div class="panel-card">
+            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Membres du Club Enregistrés & Statuts Secrètes</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nom d'utilisateur</th>
+                  <th>Email</th>
+                  <th>Clubs</th>
+                  <th>Rôle</th>
+                  <th>Statut Paiement</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODALES & FENÊTRES OVERLAY -->
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="font-size:1.3rem; font-weight:800;">Se Connecter</h3>
+        <button onclick="closeLoginModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <form onsubmit="handleLoginSubmit(event)">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Email</label>
+          <input type="email" id="loginEmail" class="form-input" placeholder="votre@email.com" required />
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Votre Rôle</label>
+          <select id="loginRole" class="form-select" required>
+            <option value="Membre">Membre</option>
+            <option value="Développeur">Développeur</option>
+            <option value="Organisateur">Organisateur</option>
+            <option value="Président">Président / Chef de projet</option>
+            <option value="Designer">Designer UI/UX</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label>Mot de passe</label>
+          <input type="password" id="loginPass" class="form-input" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Ouvrir la session</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="profileModal">
+    <div class="modal-card profile-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem;">
+        <h3 style="font-size:1.3rem; font-weight:800; display:flex; align-items:center; gap:0.5rem;">
+          <i data-lucide="user" style="color:var(--accent-solid);"></i> Mon Profil Membre
+        </h3>
+        <button onclick="closeProfileModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="profile-header-area">
+        <input type="file" id="profilePicInput" accept="image/*" style="display:none;" onchange="handleProfilePicUpload(event)" />
+        <div class="profile-avatar-upload" onclick="document.getElementById('profilePicInput').click()" title="Changer la photo de profil">
+          <span id="profileAvatarText">T</span>
+          <img id="profileAvatarImg" src="" style="display:none;" />
+          <div class="profile-avatar-overlay"><i data-lucide="camera" style="width:24px;"></i></div>
+        </div>
+
+        <div style="flex:1;">
+          <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.4rem;">
+            <input type="text" id="profileNameInput" class="form-input" style="font-weight:700; font-size:1.1rem; padding:0.4rem 0.8rem;" value="tayssir" />
+            <button class="btn btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem;" onclick="saveProfileName()">Enregistrer</button>
+          </div>
+          <div style="font-size:0.85rem; color:#a855f7; font-weight:600;" id="profileRoleText">Développeur</div>
+          <div style="margin-top:0.4rem;">
+            <span style="font-size:0.8rem; color:var(--text-muted);">Statut de cotisation : </span>
+            <span id="profilePaymentStatus" class="status-badge">non paye</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <h4 style="font-size:0.95rem; font-weight:700; margin-bottom:0.6rem; display:flex; align-items:center; gap:0.4rem;">
+          <i data-lucide="users" style="width:16px;"></i> Mes Clubs Actifs
+        </h4>
+        <div id="profileClubsContainer"></div>
+      </div>
+
+      <div>
+        <h4 style="font-size:0.95rem; font-weight:700; margin-bottom:0.3rem; display:flex; align-items:center; justify-content:space-between;">
+          <span style="display:flex; align-items:center; gap:0.4rem;"><i data-lucide="grid" style="width:16px;"></i> Mes Photos Partagées</span>
+          <span style="font-size:0.75rem; color:var(--text-muted);" id="photoCount">0 publication(s)</span>
+        </h4>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.8rem;">Images publiées dans les discussions par votre compte.</p>
+        
+        <div class="insta-grid" id="profileInstaGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toastMsg">Opération effectuée avec succès !</div>
+
+  <div class="notif-permission-banner" id="notifPermBanner">
+    <i data-lucide="bell-ring" style="width:22px;"></i>
+    <div style="flex:1;">
+      <div style="font-weight:700; font-size:0.88rem;">Activer les notifications ?</div>
+      <div style="color:var(--text-muted); font-size:0.78rem; margin-top:0.2rem;">Soyez alerté dès qu'un nouveau message arrive, comme sur Messenger.</div>
+      <div class="npb-actions">
+        <button class="btn btn-secondary" onclick="dismissNotifBanner()">Plus tard</button>
+        <button class="btn btn-primary" onclick="requestNotifPermission()">Activer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VOIR LE PROFIL D'UN AUTRE MEMBRE -->
+  <div class="modal-overlay" id="viewProfileModal">
+    <div class="modal-card" style="max-width:400px; text-align:center;">
+      <div style="display:flex; justify-content:flex-end;">
+        <button onclick="closeViewProfileModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <div class="avatar" id="viewProfileAvatar" style="width:80px; height:80px; font-size:2rem; margin:0 auto 1rem;">?</div>
+      <h3 id="viewProfileName" style="font-size:1.2rem; font-weight:800;">Nom</h3>
+      <div id="viewProfileRole" style="color:#a855f7; font-weight:600; font-size:0.9rem; margin:0.3rem 0 1rem;">Rôle</div>
+      <div id="viewProfileClubs" style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center; margin-bottom:1.5rem;"></div>
+      <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="startDMFromProfile()">
+        <i data-lucide="message-circle" style="width:16px;"></i> Envoyer un message
+      </button>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIQUE ET INTERACTIVITÉ DE L'APPLICATION -->
+  <script>
+    lucide.createIcons();
+
+    /* ANIMATION CANVAS EN ARRIÈRE-PLAN */
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    for (let i = 0; i < 35; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 1,
+        speedX: Math.random() * 0.4 - 0.2,
+        speedY: Math.random() * 0.4 - 0.2
+      });
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(129, 140, 248, 0.3)';
+      particles.forEach(p => {
+        p.x += p.speedX; p.y += p.speedY;
+        if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+      });
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    /* GESTION DE L'ÉTAT PARTAGÉ (LOCALSTORAGE) */
+    let currentUser = { name: "tayssir", email: "tayssir@example.com", role: "Développeur", club: "Développement Web", avatar: null, clubs: ["Développement Web", "Intelligence Artificielle"], status: "non paye" };
+    let currentChannel = 'general';
+    const REQUIRED_PASSCODE = "Gabes@2026!";
+
+    function loadSharedState() {
+      return {
+        channels: JSON.parse(localStorage.getItem('cjg_channels')) || ['general', 'projets-2026', 'annonces'],
+        channelClubs: JSON.parse(localStorage.getItem('cjg_channel_clubs')) || { 'general': 'Tous', 'projets-2026': 'Tous', 'annonces': 'Tous' },
+        messages: JSON.parse(localStorage.getItem('cjg_messages')) || {
+          'general': [{ author: 'Admin CJ', role: 'Admin', text: 'Bienvenue dans le salon général !' }],
+          'projets-2026': [{ author: 'tayssir', authorEmail: 'tayssir@example.com', role: 'Développeur', text: 'Le prototype web est presque prêt.' }],
+          'annonces': [{ author: 'Admin CJ', role: 'Admin', text: 'Inscriptions ouvertes pour l’atelier IA !' }]
+        },
+        directChats: JSON.parse(localStorage.getItem('cjg_direct_chats')) || {},
+        memberDirectChats: JSON.parse(localStorage.getItem('cjg_member_dm')) || {},
+        adminMedia: JSON.parse(localStorage.getItem('cjg_admin_media')) || [],
+        registeredUsers: JSON.parse(localStorage.getItem('cjg_registered_users')) || [
+          { name: 'tayssir', email: 'tayssir@example.com', clubs: ['Développement Web', 'Intelligence Artificielle'], role: 'Développeur', status: 'non paye' }
+        ],
+        trello: JSON.parse(localStorage.getItem('cjg_trello')) || {
+          colTodo: [
+            { title: "Atelier d'initiation aux outils IA", tag: "Formation" },
+            { title: "Préparer le tournoi inter-clubs", tag: "Organisation" }
+          ],
+          colProgress: [{ title: "Développement de l'application web", tag: "Dev" }],
+          colDone: [{ title: "Lancement de la plateforme", tag: "Validé" }]
+        }
+      };
+    }
+
+    let sharedData = loadSharedState();
+
+    function saveSharedState() {
+      localStorage.setItem('cjg_channels', JSON.stringify(sharedData.channels));
+      localStorage.setItem('cjg_channel_clubs', JSON.stringify(sharedData.channelClubs));
+      localStorage.setItem('cjg_messages', JSON.stringify(sharedData.messages));
+      localStorage.setItem('cjg_direct_chats', JSON.stringify(sharedData.directChats));
+      localStorage.setItem('cjg_member_dm', JSON.stringify(sharedData.memberDirectChats));
+      localStorage.setItem('cjg_trello', JSON.stringify(sharedData.trello));
+      localStorage.setItem('cjg_admin_media', JSON.stringify(sharedData.adminMedia));
+      localStorage.setItem('cjg_registered_users', JSON.stringify(sharedData.registeredUsers));
+    }
+
+    /* SYNCHRONISATION MULTI-ONGLETS TEMPS RÉEL */
+    window.addEventListener('storage', () => {
+      sharedData = loadSharedState();
+      renderChannels();
+      renderChatMessages();
+      renderTrelloBoard();
+      
+      const match = sharedData.registeredUsers.find(u => u.email === currentUser.email);
+      if (match) {
+        currentUser.status = match.status;
+        localStorage.setItem('cjg_user', JSON.stringify(currentUser));
+      }
+    });
+
+    async function restoreSupabaseSession() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return false;
+
+      const userId = session.user.id;
+      const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+      const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+
+      currentUser = {
+        id: userId,
+        name: profile ? profile.display_name : session.user.email.split('@')[0],
+        email: session.user.email,
+        club: (regRow && regRow.clubs && regRow.clubs[0]) || 'Développement Web',
+        clubs: (regRow && regRow.clubs) || ['Développement Web'],
+        role: (session.user.user_metadata && session.user.user_metadata.role) || 'Membre',
+        status: regRow ? (regRow.status === 'paye' ? 'paye' : 'non paye') : 'non paye',
+        isAdmin: profile ? !!profile.is_admin : false,
+        avatar: null
+      };
+      launchWorkspace();
+      return true;
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await restoreSupabaseSession();
+
+      const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+      if (settingsToggleBtn) {
+        settingsToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const dropdown = document.getElementById('settingsDropdown');
+          if (dropdown) dropdown.classList.toggle('active');
+        });
+      }
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastMsg');
+      toast.innerText = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2500);
+    }
+
+    /* ===================== NOTIFICATIONS (Messenger-style) ===================== */
+    let notifPermissionGranted = false;
+    let notifSnapshot = null;      // { channels: {name: count}, directChats: {email: count}, memberDirectChats: {key: count} }
+    let unreadCounts = {};         // { chatId: count } chatId = channel name | 'contact-admin' | 'dm:email'
+    let bellUnseen = 0;            // count shown on the bell badge, cleared as soon as the bell is opened (Messenger-style)
+    let notifPollHandle = null;
+
+    function initNotifications() {
+      if (!('Notification' in window)) return;
+      notifPermissionGranted = (Notification.permission === 'granted');
+      updateNotifBellUI();
+
+      if (Notification.permission === 'default' && !sessionStorage.getItem('cjg_notif_banner_dismissed')) {
+        setTimeout(() => { document.getElementById('notifPermBanner').classList.add('show'); }, 1200);
+      }
+
+      notifSnapshot = buildNotifSnapshot();
+
+      if (notifPollHandle) clearInterval(notifPollHandle);
+      notifPollHandle = setInterval(checkForNewMessages, 3000);
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'cjg_messages' || e.key === 'cjg_direct_chats' || e.key === 'cjg_member_dm') {
+          sharedData = loadSharedState();
+          checkForNewMessages();
+        }
+      });
+    }
+
+    function requestNotifPermission() {
+      if (!('Notification' in window)) { showToast("Les notifications ne sont pas supportées par ce navigateur."); return; }
+      Notification.requestPermission().then(p => {
+        notifPermissionGranted = (p === 'granted');
+        dismissNotifBanner();
+        showToast(notifPermissionGranted ? "Notifications activées !" : "Notifications refusées.");
+        updateNotifBellUI();
+      });
+    }
+
+    function dismissNotifBanner() {
+      document.getElementById('notifPermBanner').classList.remove('show');
+      sessionStorage.setItem('cjg_notif_banner_dismissed', 'true');
+    }
+
+    function handleNotifBellClick() {
+      // Seeing/opening the bell marks pending notifications as seen, like Messenger.
+      markBellSeen();
+
+      if (!('Notification' in window)) { showToast("Notifications non supportées par ce navigateur."); return; }
+      if (Notification.permission === 'default') { requestNotifPermission(); }
+      else if (Notification.permission === 'denied') { showToast("Notifications bloquées. Autorisez-les dans les paramètres du navigateur."); }
+      else { showToast(notifPermissionGranted ? "Notifications activées." : "Notifications désactivées."); }
+    }
+
+    function markBellSeen() {
+      if (bellUnseen === 0) return;
+      bellUnseen = 0;
+      updateNotifBellUI();
+    }
+
+    function updateNotifBellUI() {
+      const badge = document.getElementById('notifBadge');
+      if (!badge) return;
+      const total = bellUnseen;
+      badge.innerText = total > 9 ? '9+' : total;
+      badge.classList.toggle('show', total > 0);
+      document.title = total > 0 ? `(${total > 9 ? '9+' : total}) Complexe Jeunes Gabès` : 'Complexe Jeunes Gabès | Espace Membre & Administration';
+    }
+
+    function buildNotifSnapshot() {
+      const snap = { channels: {}, directChats: {}, memberDirectChats: {} };
+      Object.keys(sharedData.messages || {}).forEach(ch => { snap.channels[ch] = (sharedData.messages[ch] || []).length; });
+      Object.keys(sharedData.directChats || {}).forEach(email => { snap.directChats[email] = (sharedData.directChats[email] || []).length; });
+      Object.keys(sharedData.memberDirectChats || {}).forEach(key => { snap.memberDirectChats[key] = (sharedData.memberDirectChats[key] || []).length; });
+      return snap;
+    }
+
+    function playNotifSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine'; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.16, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        o.start(); o.stop(ctx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    function fireNewMessageNotification(chatId, chatLabel, msg) {
+      const isOpenAndVisible = (currentChannel === chatId) && document.visibilityState === 'visible';
+      if (!isOpenAndVisible) {
+        unreadCounts[chatId] = (unreadCounts[chatId] || 0) + 1;
+        bellUnseen++;
+      }
+      updateNotifBellUI();
+      renderChannels();
+
+      if (isOpenAndVisible) return; // already looking at it, no need to interrupt
+
+      playNotifSound();
+      const preview = msg.text ? msg.text.slice(0, 90) : (msg.image ? 'Photo envoyée' : 'Nouveau message');
+      showToast(`💬 ${msg.author} (${chatLabel}) : ${preview}`);
+
+      if (notifPermissionGranted && document.visibilityState !== 'visible') {
+        try {
+          const n = new Notification(`${msg.author} • ${chatLabel}`, { body: preview });
+          n.onclick = () => { window.focus(); };
+        } catch (e) {}
+      }
+    }
+
+    function checkForNewMessages() {
+      if (!currentUser || !currentUser.email) return;
+      const newSnap = buildNotifSnapshot();
+
+      // Channels
+      Object.keys(newSnap.channels).forEach(ch => {
+        const oldCount = (notifSnapshot.channels && notifSnapshot.channels[ch]) || 0;
+        const newCount = newSnap.channels[ch];
+        if (newCount > oldCount) {
+          const msgs = sharedData.messages[ch] || [];
+          msgs.slice(oldCount).forEach(m => {
+            if (m.authorEmail !== currentUser.email) fireNewMessageNotification(ch, `#${ch}`, m);
+          });
+        }
+      });
+
+      // Direct chat with admin (only relevant if it's mine)
+      const myEmail = currentUser.email;
+      const oldAdminCount = (notifSnapshot.directChats && notifSnapshot.directChats[myEmail]) || 0;
+      const newAdminCount = newSnap.directChats[myEmail] || 0;
+      if (newAdminCount > oldAdminCount) {
+        const msgs = sharedData.directChats[myEmail] || [];
+        msgs.slice(oldAdminCount).forEach(m => {
+          if (m.authorEmail !== myEmail) fireNewMessageNotification('contact-admin', 'Support Admin', m);
+        });
+      }
+
+      // Member-to-member DMs involving me
+      Object.keys(newSnap.memberDirectChats).forEach(key => {
+        const [a, b] = key.split('|');
+        if (a !== myEmail && b !== myEmail) return;
+        const otherEmail = (a === myEmail) ? b : a;
+        const oldCount = (notifSnapshot.memberDirectChats && notifSnapshot.memberDirectChats[key]) || 0;
+        const newCount = newSnap.memberDirectChats[key];
+        if (newCount > oldCount) {
+          const msgs = sharedData.memberDirectChats[key] || [];
+          const otherUser = findUserByEmail(otherEmail);
+          msgs.slice(oldCount).forEach(m => {
+            if (m.authorEmail !== myEmail) fireNewMessageNotification(`dm:${otherEmail}`, otherUser ? otherUser.name : otherEmail, m);
+          });
+        }
+      });
+
+      notifSnapshot = newSnap;
+    }
+
+    function launchWorkspace() {
+      document.querySelectorAll('.view-page').forEach(p => p.classList.remove('active'));
+      document.getElementById('workspaceView').classList.add('active');
+
+      updateUserHeaderUI();
+      renderChannels();
+      renderChatMessages();
+      renderTrelloBoard();
+      populateMemberSearchClubFilter();
+      initNotifications();
+    }
+
+    function updateUserHeaderUI() {
+      document.getElementById('userNameDisplay').innerText = currentUser.name;
+      document.getElementById('userRoleDisplay').innerText = currentUser.role || 'Membre';
+      
+      const avatarEl = document.getElementById('userAvatar');
+      if (currentUser.avatar) {
+        avatarEl.innerHTML = `<img src="${currentUser.avatar}" alt="Avatar" />`;
+      } else {
+        avatarEl.innerText = currentUser.name.charAt(0).toUpperCase();
+      }
+      
+      document.getElementById('wsClubTitle').innerText = 'Clubs: '+ (currentUser.clubs ? currentUser.clubs.join(', ') : 'Développement Web');
+    }
+
+    async function logout() {
+      await supabaseClient.auth.signOut();
+      localStorage.removeItem('cjg_user');
+      location.reload();
+    }
+
+    async function handleRegisterSubmit(e) {
+      e.preventDefault();
+      const checkboxes = document.querySelectorAll('input[name="regClubs"]:checked');
+      const selectedClubs = Array.from(checkboxes).map(cb => cb.value);
+      if (selectedClubs.length === 0) {
+        alert("Veuillez sélectionner au moins un club !");
+        return;
+      }
+
+      const name = document.getElementById('regName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const role = document.getElementById('regRole').value;
+      const submitBtn = e.target.querySelector('button[type="submit"], .btn-primary');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        // 1) Créer le compte dans Supabase Auth (le trigger "on_auth_user_created" crée automatiquement la ligne dans "profiles")
+        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
+          email, password,
+          options: { data: { display_name: name, role: role } }
+        });
+        if (signUpError) throw signUpError;
+        const userId = signUpData.user ? signUpData.user.id : (signUpData.session ? signUpData.session.user.id : null);
+
+        // 2) Relier le club principal + les clubs multiples (table profile_clubs) et enregistrer la fiche d'inscription
+        if (userId) {
+          const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
+          const boardIdByName = {};
+          (boardsRows || []).forEach(b => boardIdByName[b.name] = b.id);
+          const primaryBoardId = boardIdByName[CLUB_NAME_TO_BOARD[selectedClubs[0]] || selectedClubs[0]] || null;
+
+          if (primaryBoardId) {
+            await supabaseClient.from('profiles').update({ club_id: primaryBoardId }).eq('id', userId);
+          }
+
+          const clubRows = selectedClubs
+            .map(c => boardIdByName[CLUB_NAME_TO_BOARD[c] || c])
+            .filter(Boolean)
+            .map(clubId => ({ profile_id: userId, club_id: clubId }));
+          if (clubRows.length) {
+            await supabaseClient.from('profile_clubs').insert(clubRows);
+          }
+        }
+
+        await supabaseClient.from('registrations').insert({
+          user_id: userId,
+          full_name: name,
+          email: email,
+          clubs: selectedClubs,
+          status: 'non_paye'
+        });
+
+        currentUser = {
+          id: userId, name, email,
+          club: selectedClubs[0], clubs: selectedClubs, role,
+          status: "non paye", avatar: null
+        };
+
+        // On garde aussi une copie locale pour l'affichage du panneau membres existant
+        sharedData.registeredUsers = sharedData.registeredUsers.filter(u => u.email !== currentUser.email);
+        sharedData.registeredUsers.push(currentUser);
+        saveSharedState();
+
+        showToast("Compte créé avec succès !");
+        launchWorkspace();
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de l'inscription : " + (err.message || err));
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPass').value;
+      const role = document.getElementById('loginRole').value;
+
+      try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        const userId = data.user.id;
+        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+        const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+
+        currentUser = {
+          id: userId,
+          name: profile ? profile.display_name : email.split('@')[0],
+          email: email,
+          club: (regRow && regRow.clubs && regRow.clubs[0]) || 'Développement Web',
+          clubs: (regRow && regRow.clubs) || ['Développement Web'],
+          role: (data.user.user_metadata && data.user.user_metadata.role) || role,
+          status: regRow ? (regRow.status === 'paye' ? 'paye' : 'non paye') : 'non paye',
+          isAdmin: profile ? !!profile.is_admin : false,
+          avatar: null
+        };
+
+        closeLoginModal();
+        launchWorkspace();
+      } catch (err) {
+        console.error(err);
+        alert("Erreur de connexion : email ou mot de passe incorrect.");
+      }
+    }
+
+    function openLoginModal() { document.getElementById('loginModal').classList.add('open'); }
+    function closeLoginModal() { document.getElementById('loginModal').classList.remove('open'); }
+    function scrollToInscription() { document.getElementById('inscription').scrollIntoView({ behavior: 'smooth' }); }
+    function quickRegister(club) {
+      const checkboxes = document.querySelectorAll('input[name="regClubs"]');
+      checkboxes.forEach(cb => { cb.checked = (cb.value === club); });
+      updateClubSelectLabel();
+      scrollToInscription();
+    }
+
+    /* LISTE DÉROULANTE DE SÉLECTION DES CLUBS */
+    function toggleClubDropdown(e) {
+      if (e) e.stopPropagation();
+      const trigger = document.getElementById('clubSelectTrigger');
+      const panel = document.getElementById('clubSelectPanel');
+      const isOpen = panel.classList.toggle('open');
+      trigger.classList.toggle('open', isOpen);
+    }
+
+    function updateClubSelectLabel() {
+      const label = document.getElementById('clubSelectLabel');
+      if (!label) return;
+      const checked = Array.from(document.querySelectorAll('input[name="regClubs"]:checked')).map(cb => cb.value);
+
+      if (checked.length === 0) {
+        label.innerText = 'Sélectionnez vos clubs';
+        label.classList.remove('has-value');
+      } else if (checked.length <= 2) {
+        label.innerText = checked.join(', ');
+        label.classList.add('has-value');
+      } else {
+        label.innerText = `${checked.length} clubs sélectionnés`;
+        label.classList.add('has-value');
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('settingsDropdown');
+      if (dropdown) dropdown.classList.remove('active');
+
+      const clubWrapper = document.getElementById('clubSelectWrapper');
+      const clubPanel = document.getElementById('clubSelectPanel');
+      const clubTrigger = document.getElementById('clubSelectTrigger');
+      if (clubWrapper && clubPanel && !clubWrapper.contains(e.target)) {
+        clubPanel.classList.remove('open');
+        if (clubTrigger) clubTrigger.classList.remove('open');
+      }
+    });
+
+    /* GESTION DU PROFIL UTILISATEUR */
+    function openProfileModal() {
+      const dropdown = document.getElementById('settingsDropdown');
+      if (dropdown) dropdown.classList.remove('active');
+      const modal = document.getElementById('profileModal');
+      modal.classList.add('open');
+
+      document.getElementById('profileNameInput').value = currentUser.name;
+      document.getElementById('profileRoleText').innerText = currentUser.role || 'Membre';
+
+      const statusEl = document.getElementById('profilePaymentStatus');
+      const statusVal = currentUser.status || "non paye";
+      statusEl.innerText = statusVal;
+      if (statusVal === "paye" || statusVal === "payé") {
+        statusEl.className = "status-badge paid";
+      } else {
+        statusEl.className = "status-badge";
+      }
+
+      const avatarText = document.getElementById('profileAvatarText');
+      const avatarImg = document.getElementById('profileAvatarImg');
+
+      if (currentUser.avatar) {
+        avatarImg.src = currentUser.avatar;
+        avatarImg.style.display = 'block';
+        avatarText.style.display = 'none';
+      } else {
+        avatarText.innerText = currentUser.name.charAt(0).toUpperCase();
+        avatarText.style.display = 'block';
+        avatarImg.style.display = 'none';
+      }
+
+      const clubsContainer = document.getElementById('profileClubsContainer');
+      clubsContainer.innerHTML = '';
+      (currentUser.clubs || [currentUser.club]).forEach(cl => {
+        const pill = document.createElement('span');
+        pill.className = 'club-pill';
+        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${cl}`;
+        clubsContainer.appendChild(pill);
+      });
+
+      renderUserPhotoGallery();
+      lucide.createIcons();
+    }
+
+    function closeProfileModal() { document.getElementById('profileModal').classList.remove('open'); }
+
+    function syncCurrentUserToRegisteredUsers() {
+      const idx = sharedData.registeredUsers.findIndex(u => u.email === currentUser.email);
+      if (idx >= 0) {
+        sharedData.registeredUsers[idx] = { ...sharedData.registeredUsers[idx], ...currentUser };
+      } else {
+        sharedData.registeredUsers.push({ ...currentUser });
+      }
+      saveSharedState();
+    }
+
+    function saveProfileName() {
+      const newName = document.getElementById('profileNameInput').value.trim();
+      if (newName) {
+        currentUser.name = newName;
+        localStorage.setItem('cjg_user', JSON.stringify(currentUser));
+        syncCurrentUserToRegisteredUsers();
+        updateUserHeaderUI();
+        alert("Nom mis à jour avec succès !");
+      }
+    }
+
+    function handleProfilePicUpload(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          currentUser.avatar = evt.target.result;
+          localStorage.setItem('cjg_user', JSON.stringify(currentUser));
+          syncCurrentUserToRegisteredUsers();
+          updateUserHeaderUI();
+          openProfileModal();
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function renderUserPhotoGallery() {
+      const grid = document.getElementById('profileInstaGrid');
+      grid.innerHTML = '';
+      let userPics = [];
+
+      Object.values(sharedData.messages).forEach(channelMsgs => {
+        channelMsgs.forEach(msg => {
+          if (msg.author === currentUser.name && msg.image) {
+            userPics.push(msg.image);
+          }
+        });
+      });
+
+      document.getElementById('photoCount').innerText = `${userPics.length} publication(s)`;
+
+      if (userPics.length === 0) {
+        grid.innerHTML = `<p style="grid-column: 1 / -1; color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center;">Aucune photo partagée pour le moment.</p>`;
+        return;
+      }
+
+      userPics.forEach(imgUrl => {
+        const item = document.createElement('div');
+        item.className = 'insta-item';
+        item.innerHTML = `<img src="${imgUrl}" alt="Photo partagée" onclick="window.open('${imgUrl}', '_blank')" />`;
+        grid.appendChild(item);
+      });
+    }
+
+    /* MESSAGERIE DANS L'ESPACE MEMBRE */
+    function dmKey(emailA, emailB) {
+      return [emailA, emailB].sort().join('|');
+    }
+
+    function findUserByEmail(email) {
+      if (!email) return null;
+      if (currentUser.email === email) return currentUser;
+      return sharedData.registeredUsers.find(u => u.email === email) || null;
+    }
+
+    /* RECHERCHE DE MEMBRES */
+    function populateMemberSearchClubFilter() {
+      const select = document.getElementById('memberSearchClubFilter');
+      if (!select) return;
+      const myClubs = currentUser.clubs || [currentUser.club || 'Développement Web'];
+
+      select.innerHTML = `<option value="__all__">Tous mes clubs</option>` +
+        myClubs.map(cl => `<option value="${cl}">${cl}</option>`).join('');
+    }
+
+    function handleMemberSearch() {
+      const input = document.getElementById('memberSearchInput');
+      const resultsBox = document.getElementById('memberSearchResults');
+      const clubFilter = document.getElementById('memberSearchClubFilter').value;
+      const query = input.value.trim().toLowerCase();
+
+      const myClubs = currentUser.clubs || [currentUser.club || 'Développement Web'];
+
+      let matches = sharedData.registeredUsers.filter(u => {
+        if (u.email === currentUser.email) return false;
+        const uClubs = u.clubs || [u.club];
+        const sharesClub = clubFilter === '__all__'
+          ? uClubs.some(cl => myClubs.includes(cl))
+          : uClubs.includes(clubFilter);
+        if (!sharesClub) return false;
+        if (!query) return true;
+        return u.name.toLowerCase().includes(query);
+      });
+
+      resultsBox.innerHTML = '';
+      if (matches.length === 0) {
+        resultsBox.innerHTML = `<div class="member-search-empty">Aucun membre trouvé.</div>`;
+      } else {
+        matches.slice(0, 20).forEach(u => {
+          const uClubs = u.clubs || [u.club];
+          const item = document.createElement('div');
+          item.className = 'member-search-result-item';
+          item.innerHTML = `
+            <div class="avatar" style="width:32px; height:32px; font-size:0.8rem;">${u.name.charAt(0).toUpperCase()}</div>
+            <div>
+              <div class="member-search-result-name">${u.name}</div>
+              <div class="member-search-result-meta">${u.role || 'Membre'} • ${uClubs.join(', ')}</div>
+            </div>
+          `;
+          item.onclick = () => { openUserProfile(u.email); closeMemberSearchResults(); };
+          resultsBox.appendChild(item);
+        });
+      }
+
+      resultsBox.classList.add('open');
+    }
+
+    function closeMemberSearchResults() {
+      const resultsBox = document.getElementById('memberSearchResults');
+      if (resultsBox) resultsBox.classList.remove('open');
+      const input = document.getElementById('memberSearchInput');
+      if (input) input.value = '';
+    }
+
+    document.addEventListener('click', (e) => {
+      const searchWrapper = document.getElementById('memberSearchWrapper');
+      if (searchWrapper && !searchWrapper.contains(e.target)) {
+        closeMemberSearchResults();
+      }
+    });
+
+    /* VOIR LE PROFIL D'UN AUTRE MEMBRE */
+    let viewedProfileEmail = null;
+
+    function openUserProfile(email) {
+      const user = findUserByEmail(email);
+      if (!user) return;
+
+      viewedProfileEmail = email;
+
+      const avatarEl = document.getElementById('viewProfileAvatar');
+      if (user.avatar) {
+        avatarEl.innerHTML = `<img src="${user.avatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`;
+      } else {
+        avatarEl.innerText = user.name.charAt(0).toUpperCase();
+      }
+
+      document.getElementById('viewProfileName').innerText = user.name;
+      document.getElementById('viewProfileRole').innerText = user.role || 'Membre';
+
+      const clubsContainer = document.getElementById('viewProfileClubs');
+      clubsContainer.innerHTML = '';
+      (user.clubs || [user.club]).forEach(cl => {
+        const pill = document.createElement('span');
+        pill.className = 'club-pill';
+        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${cl}`;
+        clubsContainer.appendChild(pill);
+      });
+
+      document.getElementById('viewProfileModal').classList.add('open');
+      lucide.createIcons();
+    }
+
+    function closeViewProfileModal() {
+      document.getElementById('viewProfileModal').classList.remove('open');
+      viewedProfileEmail = null;
+    }
+
+    function startDMFromProfile() {
+      if (!viewedProfileEmail) return;
+      const email = viewedProfileEmail;
+      closeViewProfileModal();
+      openDMChannel(email);
+    }
+
+    function renderChannels() {
+      const container = document.getElementById('channelContainer');
+      container.innerHTML = '';
+
+      const userClubs = currentUser.clubs || [currentUser.club || 'Développement Web'];
+
+      const visibleChannels = sharedData.channels.filter(ch => {
+        const chClub = (sharedData.channelClubs && sharedData.channelClubs[ch]) || 'Tous';
+        return chClub === 'Tous' || userClubs.includes(chClub);
+      });
+
+      visibleChannels.forEach(ch => {
+        const item = document.createElement('div');
+        const hasUnread = !!unreadCounts[ch];
+        item.className = `channel-item ${ch === currentChannel ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}`;
+        item.innerHTML = `<i data-lucide="hash" style="width:16px;"></i> ${ch}<span class="unread-dot"></span>`;
+        item.onclick = () => switchChannel(ch, item);
+        container.appendChild(item);
+      });
+
+      lucide.createIcons();
+      renderDMList();
+    }
+
+    function renderDMList() {
+      const dmContainer = document.getElementById('dmContainer');
+      if (!dmContainer) return;
+      dmContainer.innerHTML = '';
+
+      const directItem = document.createElement('div');
+      const directHasUnread = !!unreadCounts['contact-admin'];
+      directItem.className = `channel-item ${currentChannel === 'contact-admin' ? 'active' : ''} ${directHasUnread ? 'has-unread' : ''}`;
+      directItem.innerHTML = `<i data-lucide="shield" style="width:16px;"></i> Support Direct Admin<span class="unread-dot"></span>`;
+      directItem.onclick = () => switchChannel('contact-admin', directItem);
+      dmContainer.appendChild(directItem);
+
+      // Conversations privées actives avec d'autres membres
+      const myEmail = currentUser.email;
+      const activeDMs = Object.keys(sharedData.memberDirectChats || {}).filter(key => {
+        const [a, b] = key.split('|');
+        return (a === myEmail || b === myEmail) && (sharedData.memberDirectChats[key] || []).length > 0;
+      });
+
+      activeDMs.forEach(key => {
+        const [a, b] = key.split('|');
+        const otherEmail = (a === myEmail) ? b : a;
+        const otherUser = findUserByEmail(otherEmail);
+        const otherName = otherUser ? otherUser.name : otherEmail;
+        const channelId = `dm:${otherEmail}`;
+
+        const item = document.createElement('div');
+        const dmHasUnread = !!unreadCounts[channelId];
+        item.className = `channel-item ${currentChannel === channelId ? 'active' : ''} ${dmHasUnread ? 'has-unread' : ''}`;
+        item.innerHTML = `<i data-lucide="user" style="width:16px;"></i> ${otherName}<span class="unread-dot"></span>`;
+        item.onclick = () => switchChannel(channelId, item);
+        dmContainer.appendChild(item);
+      });
+
+      lucide.createIcons();
+    }
+
+    function openDMChannel(email) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById('btnTabChat').classList.add('active');
+      document.getElementById('tabChat').classList.add('active');
+      document.getElementById('workspaceLayout').classList.remove('no-sidebar');
+
+      switchChannel(`dm:${email}`);
+    }
+
+    function switchChannel(channelName, el) {
+      currentChannel = channelName;
+
+      if (unreadCounts[channelName]) {
+        bellUnseen = Math.max(0, bellUnseen - unreadCounts[channelName]);
+        delete unreadCounts[channelName];
+        updateNotifBellUI();
+      }
+
+      let headerText = channelName;
+      if (channelName === 'contact-admin') {
+        headerText = ' Support Direct Admin (Privé)';
+      } else if (channelName.startsWith('dm:')) {
+        const otherEmail = channelName.slice(3);
+        const otherUser = findUserByEmail(otherEmail);
+        headerText = ` ${otherUser ? otherUser.name : otherEmail} (Privé)`;
+      }
+      document.getElementById('currentChannelHeader').innerText = headerText;
+
+      document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
+      if (el) {
+        el.classList.add('active');
+      } else {
+        renderChannels();
+      }
+      document.getElementById('wsChatInput').placeholder = `Envoyer un message...`;
+      renderChatMessages();
+    }
+
+    function isImageUrl(url) { return(url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null); }
+
+    function getMessagesForCurrentChannel() {
+      if (currentChannel === 'contact-admin') {
+        return sharedData.directChats[currentUser.email] || [];
+      } else if (currentChannel.startsWith('dm:')) {
+        const otherEmail = currentChannel.slice(3);
+        const key = dmKey(currentUser.email, otherEmail);
+        return sharedData.memberDirectChats[key] || [];
+      }
+      return sharedData.messages[currentChannel] || [];
+    }
+
+    function renderChatMessages() {
+      const feed = document.getElementById('chatFeed');
+      feed.innerHTML = '';
+
+      let msgs = getMessagesForCurrentChannel();
+
+      msgs.forEach((msg, idx) => {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-msg';
+        const isAdmin = msg.role === 'Admin';
+        const canDelete = (msg.author === currentUser.name || isAdmin);
+        const isSelf = msg.authorEmail && msg.authorEmail === currentUser.email;
+        const canViewProfile = !isAdmin && msg.authorEmail;
+
+        let imgHtml = msg.image ? `<img src="${msg.image}" class="chat-img-embed" />` : '';
+
+        const profileClickAttr = canViewProfile
+          ? `onclick="${isSelf ? 'openProfileModal()' : `openUserProfile('${msg.authorEmail}')`}"`
+          : '';
+
+        msgDiv.innerHTML = `
+          <div class="avatar ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr} style="${isAdmin ? 'background: linear-gradient(135deg, #ef4444, #f97316);' : ''}">${msg.author.charAt(0).toUpperCase()}</div>
+          <div class="chat-msg-body">
+            <div class="chat-msg-header">
+              <span class="chat-msg-author ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr}>${msg.author}</span>
+              <span class="role-badge ${isAdmin ? 'admin' : ''}">${msg.role}</span>
+              ${canDelete ? `<button class="btn-del-msg" onclick="deleteUserMessage(${idx})" title="Supprimer le message"><i data-lucide="trash-2" style="width:14px;"></i></button>` : ''}
+            </div>
+            <div>${msg.text}</div>
+            ${imgHtml}
+          </div>
+        `;
+        feed.appendChild(msgDiv);
+      });
+      feed.scrollTop = feed.scrollHeight;
+      lucide.createIcons();
+    }
+
+    function sendWsMessage(imageSrc = null) {
+      const input = document.getElementById('wsChatInput');
+      const text = input.value.trim();
+      if (!text && !imageSrc) return;
+
+      let detectedImg = isImageUrl(text) ? text : imageSrc;
+
+      const newMsg = {
+        author: currentUser.name,
+        authorEmail: currentUser.email,
+        role: currentUser.role || 'Membre',
+        text: detectedImg && detectedImg === text ? '' : text,
+        image: detectedImg || null
+      };
+
+      if (currentChannel === 'contact-admin') {
+        if (!sharedData.directChats[currentUser.email]) sharedData.directChats[currentUser.email] = [];
+        sharedData.directChats[currentUser.email].push(newMsg);
+      } else if (currentChannel.startsWith('dm:')) {
+        const otherEmail = currentChannel.slice(3);
+        const key = dmKey(currentUser.email, otherEmail);
+        if (!sharedData.memberDirectChats[key]) sharedData.memberDirectChats[key] = [];
+        sharedData.memberDirectChats[key].push(newMsg);
+      } else {
+        if (!sharedData.messages[currentChannel]) sharedData.messages[currentChannel] = [];
+        sharedData.messages[currentChannel].push(newMsg);
+      }
+
+      saveSharedState();
+      renderChatMessages();
+      if (currentChannel.startsWith('dm:')) renderDMList();
+      input.value = '';
+    }
+
+    function deleteUserMessage(idx) {
+      if (!confirm("Voulez-vous vraiment supprimer ce message ?")) return;
+
+      if (currentChannel === 'contact-admin') {
+        if (sharedData.directChats[currentUser.email]) {
+          sharedData.directChats[currentUser.email].splice(idx, 1);
+        }
+      } else if (currentChannel.startsWith('dm:')) {
+        const otherEmail = currentChannel.slice(3);
+        const key = dmKey(currentUser.email, otherEmail);
+        if (sharedData.memberDirectChats[key]) {
+          sharedData.memberDirectChats[key].splice(idx, 1);
+        }
+      } else {
+        if (sharedData.messages[currentChannel]) {
+          sharedData.messages[currentChannel].splice(idx, 1);
+        }
+      }
+
+      saveSharedState();
+      renderChatMessages();
+    }
+
+    function handleImageFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          sendWsMessage(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function handleWsChatKey(e) { if (e.key === 'Enter') sendWsMessage(); }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      const workspaceLayout = document.getElementById('workspaceLayout');
+
+      if (tab === 'chat') {
+        document.getElementById('btnTabChat').classList.add('active');
+        document.getElementById('tabChat').classList.add('active');
+        workspaceLayout.classList.remove('no-sidebar');
+        switchChannel('general');
+      } else if (tab === 'board') {
+        document.getElementById('btnTabBoard').classList.add('active');
+        document.getElementById('tabBoard').classList.add('active');
+        workspaceLayout.classList.add('no-sidebar');
+      } else if (tab === 'gallery') {
+        document.getElementById('btnTabGallery').classList.add('active');
+        document.getElementById('tabGallery').classList.add('active');
+        workspaceLayout.classList.add('no-sidebar');
+        renderMemberGallery();
+      }
+    }
+
+    /* GESTION DE LA GALERIE */
+    let tempGalleryImage = null;
+
+    function prepareGalleryUpload(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempGalleryImage = evt.target.result;
+          document.getElementById('descPreviewImg').src = tempGalleryImage;
+          document.getElementById('galleryDescInput').value = '';
+          document.getElementById('galleryClubSelect').value = 'all';
+          document.getElementById('galleryDescModal').classList.add('open');
+          document.getElementById('galleryFileInput').value = '';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function confirmGalleryUpload() {
+      if (!tempGalleryImage) return;
+      
+      const description = document.getElementById('galleryDescInput').value.trim();
+      const club = document.getElementById('galleryClubSelect').value;
+      
+      let pendingGallery = JSON.parse(localStorage.getItem('cjg_pending_gallery')) || [];
+      pendingGallery.push({
+        image: tempGalleryImage,
+        author: currentUser.name,
+        email: currentUser.email,
+        description: description,
+        club: club,
+        timestamp: new Date().toLocaleString('fr-FR'),
+        approved: false
+      });
+      localStorage.setItem('cjg_pending_gallery', JSON.stringify(pendingGallery));
+      
+      tempGalleryImage = null;
+      closeDescModal();
+      showToastMessage("Photo soumise ! En attente d'approbation de l'administrateur");
+      renderMemberGallery();
+    }
+
+    function closeDescModal() {
+      document.getElementById('galleryDescModal').classList.remove('open');
+      tempGalleryImage = null;
+    }
+
+    function renderMemberGallery() {
+      const grid = document.getElementById('memberGalleryGrid');
+      if (!grid) return;
+      
+      grid.innerHTML = '';
+      let approvedGallery = JSON.parse(localStorage.getItem('cjg_approved_gallery')) || [];
+
+      if (approvedGallery.length === 0) {
+        grid.innerHTML = `<p style="grid-column: 1 / -1; color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center;">Aucune photo approuvée pour le moment.</p>`;
+        return;
+      }
+
+      const clubLabels = {
+        'all': 'Complexe',
+        'Développement Web': 'Dev Web',
+        'Intelligence Artificielle': 'IA',
+        'Langue Allemande': 'Allemand',
+        'Compétences de Vie': 'Life Skills',
+        'Échecs': 'Échecs',
+        'Animation': 'Animation',
+        'Musique': 'Musique',
+        'Activités Artistiques': 'Arts',
+        'Activités Sportives': 'Sport',
+        'Activités Scientifiques': 'Sciences',
+        'Activités Culturelles et de Loisirs': 'Culture & Loisirs'
+      };
+
+      approvedGallery.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.style.borderRadius = '12px';
+        card.style.overflow = 'hidden';
+        card.style.cursor = 'pointer';
+        card.style.position = 'relative';
+        card.style.border = '1px solid var(--card-border)';
+        card.style.background = 'var(--card-bg)';
+        card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+        
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = `Photo de ${item.author}`;
+        img.style.width = '100%';
+        img.style.height = '180px';
+        img.style.objectFit = 'cover';
+        img.style.transition = 'transform 0.3s';
+        
+        const info = document.createElement('div');
+        info.style.padding = '0.75rem';
+        info.style.fontSize = '0.8rem';
+        info.style.borderTop = '1px solid var(--card-border)';
+        
+        const clubBadge = document.createElement('div');
+        clubBadge.style.display = 'inline-block';
+        clubBadge.style.background = 'rgba(99, 102, 241, 0.2)';
+        clubBadge.style.color = '#a5b4fc';
+        clubBadge.style.padding = '0.2rem 0.5rem';
+        clubBadge.style.borderRadius = '4px';
+        clubBadge.style.fontSize = '0.7rem';
+        clubBadge.style.fontWeight = '600';
+        clubBadge.style.marginBottom = '0.3rem';
+        clubBadge.innerText = clubLabels[item.club] || item.club;
+        
+        const desc = document.createElement('div');
+        desc.style.color = 'var(--text-muted)';
+        desc.style.fontSize = '0.75rem';
+        desc.style.lineHeight = '1.3';
+        desc.style.marginBottom = '0.3rem';
+        desc.style.minHeight = '2.1rem';
+        desc.style.display = '-webkit-box';
+        desc.style.webkitLineClamp = '2';
+        desc.style.webkitBoxOrient = 'vertical';
+        desc.style.overflow = 'hidden';
+        desc.innerText = item.description || '(pas de description)';
+        
+        const author = document.createElement('div');
+        author.style.color = 'var(--text-muted)';
+        author.style.fontSize = '0.7rem';
+        author.style.marginTop = '0.3rem';
+        author.innerText = ` ${item.author}`;
+        
+        info.appendChild(clubBadge);
+        info.appendChild(desc);
+        info.appendChild(author);
+        
+        card.appendChild(img);
+        card.appendChild(info);
+        
+        card.onclick = () => openGalleryLightbox(item);
+        
+        card.addEventListener('mouseenter', () => {
+          img.style.transform = 'scale(1.05)';
+          card.style.transform = 'translateY(-4px)';
+          card.style.boxShadow = '0 8px 16px rgba(0,0,0,0.3)';
+        });
+        card.addEventListener('mouseleave', () => {
+          img.style.transform = 'scale(1)';
+          card.style.transform = 'translateY(0)';
+          card.style.boxShadow = 'none';
+        });
+        
+        grid.appendChild(card);
+      });
+    }
+
+    let currentLightboxPhoto = null;
+
+    function openGalleryLightbox(item) {
+      const clubLabels = {
+        'all': 'Complexe Jeunes Gabès',
+        'Développement Web': 'Développement Web',
+        'Intelligence Artificielle': 'Intelligence Artificielle (IA)',
+        'Langue Allemande': 'Langue Allemande',
+        'Compétences de Vie': 'Compétences de Vie (Life Skills)',
+        'Échecs': 'Club d\'Échecs (Chess Club)',
+        'Animation': 'Animation',
+        'Musique': 'Musique',
+        'Activités Artistiques': 'Activités Artistiques',
+        'Activités Sportives': 'Activités Sportives',
+        'Activités Scientifiques': 'Activités Scientifiques',
+        'Activités Culturelles et de Loisirs': 'Activités Culturelles et de Loisirs'
+      };
+
+      currentLightboxPhoto = item;
+      document.getElementById('lightboxImage').src = item.image;
+      document.getElementById('lightboxDescription').innerText = item.description || 'Aucune description';
+      document.getElementById('lightboxAuthor').innerHTML = ` Par <strong>${item.author}</strong> • ${clubLabels[item.club] || item.club} • ${item.timestamp}`;
+      document.getElementById('galleryLightbox').classList.add('open');
+    }
+
+    function closeGalleryLightbox() {
+      document.getElementById('galleryLightbox').classList.remove('open');
+      currentLightboxPhoto = null;
+    }
+
+    function downloadGalleryPhoto() {
+      if (!currentLightboxPhoto) return;
+      
+      const link = document.createElement('a');
+      link.href = currentLightboxPhoto.image;
+      link.download = `CJGabes_${currentLightboxPhoto.author}_${new Date().getTime()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToastMessage(' Photo téléchargée sur votre appareil!');
+    }
+
+    function showToastMessage(msg) {
+      const toast = document.getElementById('toastMsg');
+      if (toast) {
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 2500);
+      }
+    }
+
+    function renderTrelloBoard() {
+      const cols = ['colTodo', 'colProgress', 'colDone'];
+      cols.forEach(colKey => {
+        const container = document.getElementById(colKey);
+        const countEl = document.getElementById('count' + colKey.replace('col', ''));
+        if (!container) return;
+        
+        container.innerHTML = '';
+        const cards = sharedData.trello[colKey] || [];
+        if (countEl) countEl.innerText = cards.length;
+
+        cards.forEach((card, idx) => {
+          const cardDiv = document.createElement('div');
+          cardDiv.className = 'kanban-card';
+          cardDiv.draggable = true;
+          cardDiv.dataset.col = colKey;
+          cardDiv.dataset.idx = idx;
+          cardDiv.innerHTML = `
+            <div class="card-actions">
+              ${colKey !== 'colTodo' ? `<button class="card-btn" onclick="moveCard('${colKey}', ${idx}, -1)" title="Déplacer à gauche"><i data-lucide="arrow-left" style="width:12px;"></i></button>` : ''}
+              ${colKey !== 'colDone' ? `<button class="card-btn" onclick="moveCard('${colKey}', ${idx}, 1)" title="Déplacer à droite"><i data-lucide="arrow-right" style="width:12px;"></i></button>` : ''}
+              <button class="card-btn delete" onclick="deleteCard('${colKey}', ${idx})" title="Supprimer"><i data-lucide="trash-2" style="width:12px;"></i></button>
+            </div>
+            <span class="card-tag">${card.tag || 'Tâche'}</span>
+            <div style="font-size:0.88rem; font-weight:600;">${card.title}</div>
+          `;
+          
+          // Drag events
+          cardDiv.addEventListener('dragstart', handleCardDragStart);
+          cardDiv.addEventListener('dragend', handleCardDragEnd);
+          
+          container.appendChild(cardDiv);
+        });
+        
+        // Drop zone events for columns
+        container.addEventListener('dragover', handleColumnDragOver);
+        container.addEventListener('drop', handleColumnDrop);
+        container.addEventListener('dragleave', handleColumnDragLeave);
+      });
+      lucide.createIcons();
+    }
+
+    let draggedCard = null;
+
+    function handleCardDragStart(e) {
+      draggedCard = e.target.closest('.kanban-card');
+      draggedCard.style.opacity = '0.5';
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleCardDragEnd(e) {
+      if (draggedCard) {
+        draggedCard.style.opacity = '1';
+      }
+      draggedCard = null;
+    }
+
+    function handleColumnDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+    }
+
+    function handleColumnDragLeave(e) {
+      if (e.currentTarget === e.target) {
+        e.currentTarget.style.background = '';
+      }
+    }
+
+    function handleColumnDrop(e) {
+      e.preventDefault();
+      e.currentTarget.style.background = '';
+      
+      if (!draggedCard) return;
+
+      const fromCol = draggedCard.dataset.col;
+      const fromIdx = parseInt(draggedCard.dataset.idx);
+      const toCol = e.currentTarget.id;
+
+      if (fromCol && fromIdx !== undefined && toCol) {
+        if (sharedData.trello[fromCol] && sharedData.trello[fromCol][fromIdx]) {
+          const [card] = sharedData.trello[fromCol].splice(fromIdx, 1);
+          if (!sharedData.trello[toCol]) sharedData.trello[toCol] = [];
+          sharedData.trello[toCol].push(card);
+          saveSharedState();
+          renderTrelloBoard();
+        }
+      }
+    }
+
+    function addNewCard(colKey) {
+      const title = prompt("Titre de la nouvelle tâche :");
+      if (!title) return;
+      const tag = prompt("Tag / Catégorie (ex: Dev, Formation, Urgent) :", "Général") || "Général";
+
+      if (!sharedData.trello[colKey]) sharedData.trello[colKey] = [];
+      sharedData.trello[colKey].push({ title, tag });
+      saveSharedState();
+      renderTrelloBoard();
+    }
+
+    function moveCard(fromCol, idx, direction) {
+      const colOrder = ['colTodo', 'colProgress', 'colDone'];
+      const currentIdx = colOrder.indexOf(fromCol);
+      const targetCol = colOrder[currentIdx + direction];
+
+      if (targetCol && sharedData.trello[fromCol][idx]) {
+        const [card] = sharedData.trello[fromCol].splice(idx, 1);
+        if (!sharedData.trello[targetCol]) sharedData.trello[targetCol] = [];
+        sharedData.trello[targetCol].push(card);
+        saveSharedState();
+        renderTrelloBoard();
+      }
+    }
+
+    function deleteCard(colKey, idx) {
+      if (confirm("Supprimer cette carte ?")) {
+        sharedData.trello[colKey].splice(idx, 1);
+        saveSharedState();
+        renderTrelloBoard();
+      }
+    }
+
+    /* FONCTIONS DU PANNEAU D'ADMINISTRATION */
+    function openAdminPanel() {
+      document.querySelectorAll('.view-page').forEach(p => p.classList.remove('active'));
+      document.getElementById('adminView').classList.add('active');
+
+      if (sessionStorage.getItem('cjg_admin_authed') === 'true') {
+        unlockDashboard();
+      } else {
+        document.getElementById('lockOverlay').style.display = 'flex';
+      }
+    }
+
+    function closeAdminPanel() {
+      launchWorkspace();
+    }
+
+    function verifyAdminPasscode(e) {
+      e.preventDefault();
+      const inputVal = document.getElementById('adminPasscodeInput').value;
+      if (inputVal === REQUIRED_PASSCODE) {
+        sessionStorage.setItem('cjg_admin_authed', 'true');
+        unlockDashboard();
+      } else {
+        document.getElementById('authError').style.display = 'block';
+      }
+    }
+
+    function unlockDashboard() {
+      document.getElementById('lockOverlay').style.display = 'none';
+      refreshAdminData();
+    }
+
+    function lockAdminSession() {
+      sessionStorage.removeItem('cjg_admin_authed');
+      document.getElementById('lockOverlay').style.display = 'flex';
+      document.getElementById('adminPasscodeInput').value = '';
+    }
+
+    function refreshAdminData() {
+      sharedData = loadSharedState();
+
+      let totalMsgs = 0;
+      let totalMedia = sharedData.adminMedia.length;
+
+      Object.values(sharedData.messages).forEach(msgs => {
+        totalMsgs += msgs.length;
+        msgs.forEach(m => { if (m.image) totalMedia++; });
+      });
+
+      Object.values(sharedData.directChats).forEach(msgs => {
+        totalMsgs += msgs.length;
+      });
+
+      document.getElementById('statMessages').innerText = totalMsgs;
+      document.getElementById('statChannels').innerText = sharedData.channels.length;
+      document.getElementById('statMedia').innerText = totalMedia;
+
+      // Menu déroulant pour le choix du salon des annonces
+      const annSelect = document.getElementById('announcementChannelSelect');
+      if (annSelect) {
+        annSelect.innerHTML = '';
+        sharedData.channels.forEach(ch => {
+          const opt = document.createElement('option');
+          opt.value = ch;
+          opt.innerText = `# ${ch}`;
+          annSelect.appendChild(opt);
+        });
+      }
+
+      // Menu déroulant pour le chat direct privé
+      const directSelect = document.getElementById('directUserSelect');
+      if (directSelect) {
+        const selectedPrev = directSelect.value;
+        directSelect.innerHTML = '';
+        sharedData.registeredUsers.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.email;
+          opt.innerText = `${u.name} (${u.email})`;
+          directSelect.appendChild(opt);
+        });
+        if (selectedPrev) directSelect.value = selectedPrev;
+      }
+
+      renderAdminDirectChat();
+      renderChannelsTable();
+      renderAdminMediaGrid();
+      renderUsersTable();
+    }
+
+    function switchSection(secId, item) {
+      document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      
+      document.getElementById(secId).classList.add('active');
+      item.classList.add('active');
+
+      const titleMap = {
+        'sec-overview': 'Vue d\'ensemble',
+        'sec-direct-chat': 'Discussion Secrète Administrateur',
+        'sec-channels': 'Gestion des Salons & Discussions',
+        'sec-media': 'Gestionnaire Média & Photos',
+        'sec-users': 'Membres & Statuts de Cotisation'
+      };
+      document.getElementById('sectionTitle').innerText = titleMap[secId];
+    }
+
+    /* LOGIQUE DU CHAT DIRECT ADMIN (PAR EMAIL) */
+    function renderAdminDirectChat() {
+      const feed = document.getElementById('adminDirectFeed');
+      if (!feed) return;
+      feed.innerHTML = '';
+      const email = document.getElementById('directUserSelect').value;
+      if (!email) {
+        feed.innerHTML = '<p style="color:var(--text-muted);">Aucun utilisateur sélectionné.</p>';
+        return;
+      }
+
+      const msgs = sharedData.directChats[email] || [];
+
+      msgs.forEach((msg, idx) => {
+        const div = document.createElement('div');
+        const isAdmin = msg.role === 'Admin';
+        div.className = 'msg-item';
+        div.style.background = isAdmin ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
+
+        div.innerHTML = `
+          <div>
+            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${msg.author} (${msg.role})</div>
+            <div style="font-size:0.88rem; margin-top:0.2rem;">${msg.text}</div>
+          </div>
+          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteDirectMsg('${email}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
+        `;
+        feed.appendChild(div);
+      });
+      feed.scrollTop = feed.scrollHeight;
+      lucide.createIcons();
+    }
+
+    function sendAdminDirectMessage() {
+      const input = document.getElementById('adminDirectInput');
+      const email = document.getElementById('directUserSelect').value;
+      const text = input.value.trim();
+      if (!text || !email) return;
+
+      if (!sharedData.directChats[email]) sharedData.directChats[email] = [];
+
+      sharedData.directChats[email].push({
+        author: 'Admin CJ',
+        role: 'Admin',
+        text: text
+      });
+
+      saveSharedState();
+      input.value = '';
+      refreshAdminData();
+    }
+
+    function deleteDirectMsg(email, idx) {
+      if (sharedData.directChats[email]) {
+        sharedData.directChats[email].splice(idx, 1);
+        saveSharedState();
+        showToast("Message supprimé !");
+        refreshAdminData();
+      }
+    }
+
+    function handleAdminDirectKey(e) { if (e.key === 'Enter') sendAdminDirectMessage(); }
+
+    /* ANNONCES ADMIN */
+    function postAdminAnnouncement(e) {
+      e.preventDefault();
+      const channel = document.getElementById('announcementChannelSelect').value;
+      const text = document.getElementById('announcementText').value.trim();
+
+      if (!text) return;
+
+      if (!sharedData.messages[channel]) sharedData.messages[channel] = [];
+
+      sharedData.messages[channel].push({
+        author: 'Admin CJ',
+        role: 'Admin',
+        text: ` ANNONCE OFFICIELLE : ${text}`
+      });
+
+      saveSharedState();
+      document.getElementById('announcementText').value = '';
+      showToast("Annonce publiée !");
+      refreshAdminData();
+    }
+
+    /* GESTION DES SALONS */
+    function createNewChannel(e) {
+      e.preventDefault();
+      const input = document.getElementById('newChannelName');
+      const clubSelect = document.getElementById('newChannelClub');
+      const chName = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+      const chClub = clubSelect ? clubSelect.value : 'Tous';
+
+      if (!chName) return;
+
+      if (!sharedData.channels.includes(chName)) {
+        sharedData.channels.push(chName);
+        if (!sharedData.channelClubs) sharedData.channelClubs = {};
+        sharedData.channelClubs[chName] = chClub;
+        sharedData.messages[chName] = [{ author: 'Admin CJ', role: 'Admin', text: `Salon #${chName} créé.` }];
+        saveSharedState();
+
+        input.value = '';
+        showToast(`Salon #${chName} créé !`);
+        refreshAdminData();
+      }
+    }
+
+    function renderChannelsTable() {
+      const tbody = document.getElementById('channelsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const clubLabels = {
+        'Tous': 'Tous les clubs',
+        'Développement Web': 'Développement Web',
+        'Intelligence Artificielle': 'Intelligence Artificielle (IA)',
+        'Langue Allemande': 'Langue Allemande',
+        'Compétences de Vie': 'Compétences de Vie (Life Skills)',
+        'Échecs': 'Club d\'Échecs (Chess Club)',
+        'Animation': 'Animation',
+        'Musique': 'Musique',
+        'Activités Artistiques': 'Activités Artistiques',
+        'Activités Sportives': 'Activités Sportives',
+        'Activités Scientifiques': 'Activités Scientifiques',
+        'Activités Culturelles et de Loisirs': 'Activités Culturelles et de Loisirs'
+      };
+
+      sharedData.channels.forEach(ch => {
+        const count = (sharedData.messages[ch] || []).length;
+        const chClub = (sharedData.channelClubs && sharedData.channelClubs[ch]) || 'Tous';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong># ${ch}</strong></td>
+          <td>${clubLabels[chClub] || chClub}</td>
+          <td>${count} message(s)</td>
+          <td>
+            ${(ch !== 'general') ? `<button class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.75rem;" onclick="deleteChannel('${ch}')"><i data-lucide="trash-2" style="width:14px;"></i> Supprimer</button>` : '<span style="color:var(--text-muted); font-size:0.8rem;">Salon protégé</span>'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    function deleteChannel(chName) {
+      if (confirm(`Voulez-vous vraiment supprimer le salon #${chName} ?`)) {
+        sharedData.channels = sharedData.channels.filter(c => c !== chName);
+        delete sharedData.messages[chName];
+        if (sharedData.channelClubs) delete sharedData.channelClubs[chName];
+        saveSharedState();
+
+        showToast("Salon supprimé !");
+        refreshAdminData();
+      }
+    }
+
+    /* GESTIONNAIRE DE MÉDIAS */
+    function uploadAdminMedia(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          sharedData.adminMedia.push(evt.target.result);
+          saveSharedState();
+          showToast("Image téléversée !");
+          refreshAdminData();
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function renderAdminMediaGrid() {
+      const grid = document.getElementById('adminMediaGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      if (sharedData.adminMedia.length === 0) {
+        grid.innerHTML = `<p style="grid-column: 1 / -1; color: var(--text-muted); font-size: 0.85rem;">Aucun fichier média trouvé.</p>`;
+        return;
+      }
+
+      sharedData.adminMedia.forEach((imgUrl, idx) => {
+        const card = document.createElement('div');
+        card.className = 'media-card';
+        card.innerHTML = `
+          <img src="${imgUrl}" alt="Media Admin" />
+          <div class="media-info">
+            <button class="btn btn-secondary" style="padding:0.3rem 0.5rem;" onclick="window.open('${imgUrl}', '_blank')" title="Agrandir"><i data-lucide="external-link" style="width:14px;"></i></button>
+            <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteAdminMedia(${idx})" title="Supprimer"><i data-lucide="trash-2" style="width:14px;"></i></button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function deleteAdminMedia(idx) {
+      if (idx < sharedData.adminMedia.length) {
+        sharedData.adminMedia.splice(idx, 1);
+        saveSharedState();
+        showToast("Image supprimée !");
+        refreshAdminData();
+      }
+    }
+
+    /* ROSTER DES MEMBRES ET BASCULE DES COTISATIONS (depuis Supabase: table "registrations") */
+    let rosterRegistrations = [];
+
+    async function renderUsersTable() {
+      const tbody = document.getElementById('usersTableBody');
+      if (!tbody) return;
+
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // Si l'utilisateur courant n'est pas admin, la policy RLS bloque la lecture de tous les enregistrements.
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted);">Accès administrateur requis pour voir la liste complète des membres.</td></tr>`;
+        return;
+      }
+
+      rosterRegistrations = data || [];
+      tbody.innerHTML = '';
+
+      rosterRegistrations.forEach((u, idx) => {
+        const tr = document.createElement('tr');
+        const isPaid = u.status === 'paye';
+        const clubsStr = (u.clubs || []).join(', ') || 'Non renseigné';
+
+        tr.innerHTML = `
+          <td><strong>${u.full_name}</strong></td>
+          <td>${u.email || 'Non renseigné'}</td>
+          <td>${clubsStr}</td>
+          <td><span style="background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem;">Membre</span></td>
+          <td>
+            <span style="padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem; background:${isPaid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${isPaid ? '#34d399' : '#f87171'};">
+              ${isPaid ? 'paye' : 'non paye'}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="togglePaymentStatus(${idx})">
+              Marquer comme ${isPaid ? 'non paye' : 'paye'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function togglePaymentStatus(idx) {
+      const row = rosterRegistrations[idx];
+      if (!row) return;
+
+      const newStatus = row.status === 'paye' ? 'non_paye' : 'paye';
+      const { error } = await supabaseClient.from('registrations').update({ status: newStatus }).eq('id', row.id);
+
+      if (error) {
+        showToast("Erreur : action réservée aux administrateurs.");
+        return;
+      }
+
+      showToast("Statut de paiement mis à jour !");
+      renderUsersTable();
+    }
+  </script>
+</body>
+</html>
