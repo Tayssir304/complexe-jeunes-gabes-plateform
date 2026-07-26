@@ -2777,4 +2777,76 @@
     }
   </script>
 </body>
+</html>) {
+      if (idx < sharedData.adminMedia.length) {
+        sharedData.adminMedia.splice(idx, 1);
+        saveSharedState();
+        showToast("Image supprimée !");
+        refreshAdminData();
+      }
+    }
+
+    /* ROSTER DES MEMBRES ET BASCULE DES COTISATIONS (depuis Supabase: table "registrations") */
+    let rosterRegistrations = [];
+
+    async function renderUsersTable() {
+      const tbody = document.getElementById('usersTableBody');
+      if (!tbody) return;
+
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // Si l'utilisateur courant n'est pas admin, la policy RLS bloque la lecture de tous les enregistrements.
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted);">Accès administrateur requis pour voir la liste complète des membres.</td></tr>`;
+        return;
+      }
+
+      rosterRegistrations = data || [];
+      tbody.innerHTML = '';
+
+      rosterRegistrations.forEach((u, idx) => {
+        const tr = document.createElement('tr');
+        const isPaid = u.status === 'paye';
+        const clubsStr = (u.clubs || []).join(', ') || 'Non renseigné';
+
+        tr.innerHTML = `
+          <td><strong>${u.full_name}</strong></td>
+          <td>${u.email || 'Non renseigné'}</td>
+          <td>${clubsStr}</td>
+          <td><span style="background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem;">Membre</span></td>
+          <td>
+            <span style="padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem; background:${isPaid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${isPaid ? '#34d399' : '#f87171'};">
+              ${isPaid ? 'paye' : 'non paye'}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="togglePaymentStatus(${idx})">
+              Marquer comme ${isPaid ? 'non paye' : 'paye'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function togglePaymentStatus(idx) {
+      const row = rosterRegistrations[idx];
+      if (!row) return;
+
+      const newStatus = row.status === 'paye' ? 'non_paye' : 'paye';
+      const { error } = await supabaseClient.from('registrations').update({ status: newStatus }).eq('id', row.id);
+
+      if (error) {
+        showToast("Erreur : action réservée aux administrateurs.");
+        return;
+      }
+
+      showToast("Statut de paiement mis à jour !");
+      renderUsersTable();
+    }
+  </script>
+</body>
 </html>
