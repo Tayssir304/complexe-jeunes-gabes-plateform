@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@1.27.0/dist/umd/lucide.min.js" integrity="sha384-iGjGimQxA1QCAbLRiSWPFc+KsjPW3kLS/2Cub+yRgYfd4EUEx/dxoJ0MKyEsbjop" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js" integrity="sha384-M65KxMm/JqBppck6onbmAgPVMBHrmPCf1L17Q+71EcvI9/VVI8j5cqoxQf6lj6h2" crossorigin="anonymous"></script>
   <script>
     // ==== Connexion Supabase ====
     const SUPABASE_URL = "https://bdhxgzfqgsnbxdlfaycs.supabase.co";
@@ -793,12 +793,15 @@
         <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem;">Accès Restreint</h2>
         <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Veuillez saisir le code secret d'administration.</p>
 
-        <form onsubmit="verifyAdminPasscode(event)">
-          <div class="form-group">
-            <input type="password" id="adminPasscodeInput" class="form-input" placeholder="Entrez le code secret..." style="text-align:center; font-size:1rem; letter-spacing:2px;" autofocus required />
+        <form onsubmit="verifyAdminLogin(event)">
+          <div class="form-group" style="margin-bottom:0.75rem;">
+            <input type="email" id="adminEmailInput" class="form-input" placeholder="Email administrateur" style="text-align:center; font-size:1rem;" autofocus required />
           </div>
-          <p id="authError" style="color:var(--accent-red); font-size:0.8rem; display:none; margin-bottom:1rem;">Code incorrect ! Veuillez réessayer.</p>
-          <button type="submit" class="btn btn-danger" style="width:100%;">Déverrouiller l'Administration</button>
+          <div class="form-group">
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="Mot de passe" style="text-align:center; font-size:1rem;" required />
+          </div>
+          <p id="authError" style="color:var(--accent-red); font-size:0.8rem; display:none; margin-bottom:1rem;">Identifiants incorrects ou accès non autorisé.</p>
+          <button type="submit" id="authSubmitBtn" class="btn btn-danger" style="width:100%;">Se connecter</button>
         </form>
       </div>
     </div>
@@ -1156,7 +1159,6 @@
     /* GESTION DE L'ÉTAT PARTAGÉ (LOCALSTORAGE) */
     let currentUser = { name: "tayssir", email: "tayssir@example.com", role: "Développeur", club: "Développement Web", avatar: null, clubs: ["Développement Web", "Intelligence Artificielle"], status: "non paye" };
     let currentChannel = 'general';
-    const REQUIRED_PASSCODE = "Gabes@2026!";
 
     function loadSharedState() {
       return {
@@ -1458,6 +1460,8 @@
       const password = document.getElementById('regPassword').value;
       const role = document.getElementById('regRole').value;
       const submitBtn = e.target.querySelector('button[type="submit"], .btn-primary');
+      // Empêche le double-clic / la resoumission rapide (UX ; la vraie limite est côté Supabase Auth)
+      if (submitBtn && submitBtn.disabled) return;
       if (submitBtn) submitBtn.disabled = true;
 
       try {
@@ -1512,10 +1516,20 @@
         launchWorkspace();
       } catch (err) {
         console.error(err);
-        alert("Erreur lors de l'inscription : " + (err.message || err));
+        if (isRateLimitError(err)) {
+          alert("Trop de tentatives d'inscription depuis cet appareil. Veuillez patienter quelques minutes avant de réessayer.");
+        } else {
+          alert("Erreur lors de l'inscription : " + (err.message || err));
+        }
       } finally {
         if (submitBtn) submitBtn.disabled = false;
       }
+    }
+
+    function isRateLimitError(err) {
+      if (!err) return false;
+      const msg = (err.message || '').toLowerCase();
+      return err.status === 429 || msg.includes('rate limit') || msg.includes('security purposes') || msg.includes('too many requests');
     }
 
     async function handleLoginSubmit(e) {
@@ -1548,7 +1562,11 @@
         launchWorkspace();
       } catch (err) {
         console.error(err);
-        alert("Erreur de connexion : email ou mot de passe incorrect.");
+        if (isRateLimitError(err)) {
+          alert("Trop de tentatives de connexion. Veuillez patienter quelques minutes avant de réessayer.");
+        } else {
+          alert("Erreur de connexion : email ou mot de passe incorrect.");
+        }
       }
     }
 
@@ -2407,27 +2425,100 @@
     function openAdminPanel() {
       document.querySelectorAll('.view-page').forEach(p => p.classList.remove('active'));
       document.getElementById('adminView').classList.add('active');
+      checkAdminSessionAndUnlock();
+    }
 
-      if (sessionStorage.getItem('cjg_admin_authed') === 'true') {
-        unlockDashboard();
-      } else {
-        document.getElementById('lockOverlay').style.display = 'flex';
+    async function checkAdminSessionAndUnlock() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        const ok = await checkIsAdmin();
+        if (ok) {
+          unlockDashboard();
+          return;
+        }
+        await supabaseClient.auth.signOut();
       }
+      document.getElementById('lockOverlay').style.display = 'flex';
+    }
+
+    // Vérifie que l'utilisateur connecté a le droit d'admin (RLS côté Supabase, pas un flag client)
+    async function checkIsAdmin() {
+      const { error } = await supabaseClient
+        .from('registrations')
+        .select('id', { count: 'exact', head: true });
+      return !error;
     }
 
     function closeAdminPanel() {
       launchWorkspace();
     }
 
-    function verifyAdminPasscode(e) {
+    let adminFailedAttempts = 0;
+    let adminCooldownUntil = 0;
+
+    function startAdminCooldown(seconds) {
+      adminCooldownUntil = Date.now() + seconds * 1000;
+      const btn = document.getElementById('authSubmitBtn');
+      const errEl = document.getElementById('authError');
+      const tick = () => {
+        const remaining = Math.ceil((adminCooldownUntil - Date.now()) / 1000);
+        if (remaining <= 0) {
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = `Réessayer dans ${remaining}s...`;
+        errEl.textContent = "Trop de tentatives. Veuillez patienter.";
+        errEl.style.display = 'block';
+        setTimeout(tick, 500);
+      };
+      tick();
+    }
+
+    async function verifyAdminLogin(e) {
       e.preventDefault();
-      const inputVal = document.getElementById('adminPasscodeInput').value;
-      if (inputVal === REQUIRED_PASSCODE) {
-        sessionStorage.setItem('cjg_admin_authed', 'true');
-        unlockDashboard();
-      } else {
-        document.getElementById('authError').style.display = 'block';
+      if (Date.now() < adminCooldownUntil) return;
+
+      const email = document.getElementById('adminEmailInput').value.trim();
+      const password = document.getElementById('adminPasswordInput').value;
+      const btn = document.getElementById('authSubmitBtn');
+      const errEl = document.getElementById('authError');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Connexion...';
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+      if (error || !data.session) {
+        adminFailedAttempts++;
+        if (isRateLimitError(error)) {
+          startAdminCooldown(60);
+          return;
+        }
+        errEl.textContent = "Email ou mot de passe incorrect.";
+        errEl.style.display = 'block';
+        if (adminFailedAttempts >= 3) {
+          startAdminCooldown(Math.min(5 * (adminFailedAttempts - 2), 30));
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+        return;
       }
+
+      const isAdmin = await checkIsAdmin();
+      if (!isAdmin) {
+        errEl.textContent = "Ce compte n'a pas les droits administrateur.";
+        errEl.style.display = 'block';
+        await supabaseClient.auth.signOut();
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+        return;
+      }
+
+      adminFailedAttempts = 0;
+      unlockDashboard();
     }
 
     function unlockDashboard() {
@@ -2435,10 +2526,11 @@
       refreshAdminData();
     }
 
-    function lockAdminSession() {
-      sessionStorage.removeItem('cjg_admin_authed');
+    async function lockAdminSession() {
+      await supabaseClient.auth.signOut();
       document.getElementById('lockOverlay').style.display = 'flex';
-      document.getElementById('adminPasscodeInput').value = '';
+      document.getElementById('adminEmailInput').value = '';
+      document.getElementById('adminPasswordInput').value = '';
     }
 
     function refreshAdminData() {
@@ -2706,78 +2798,6 @@
     }
 
     function deleteAdminMedia(idx) {
-      if (idx < sharedData.adminMedia.length) {
-        sharedData.adminMedia.splice(idx, 1);
-        saveSharedState();
-        showToast("Image supprimée !");
-        refreshAdminData();
-      }
-    }
-
-    /* ROSTER DES MEMBRES ET BASCULE DES COTISATIONS (depuis Supabase: table "registrations") */
-    let rosterRegistrations = [];
-
-    async function renderUsersTable() {
-      const tbody = document.getElementById('usersTableBody');
-      if (!tbody) return;
-
-      const { data, error } = await supabaseClient
-        .from('registrations')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        // Si l'utilisateur courant n'est pas admin, la policy RLS bloque la lecture de tous les enregistrements.
-        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted);">Accès administrateur requis pour voir la liste complète des membres.</td></tr>`;
-        return;
-      }
-
-      rosterRegistrations = data || [];
-      tbody.innerHTML = '';
-
-      rosterRegistrations.forEach((u, idx) => {
-        const tr = document.createElement('tr');
-        const isPaid = u.status === 'paye';
-        const clubsStr = (u.clubs || []).join(', ') || 'Non renseigné';
-
-        tr.innerHTML = `
-          <td><strong>${u.full_name}</strong></td>
-          <td>${u.email || 'Non renseigné'}</td>
-          <td>${clubsStr}</td>
-          <td><span style="background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem;">Membre</span></td>
-          <td>
-            <span style="padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem; background:${isPaid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${isPaid ? '#34d399' : '#f87171'};">
-              ${isPaid ? 'paye' : 'non paye'}
-            </span>
-          </td>
-          <td>
-            <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="togglePaymentStatus(${idx})">
-              Marquer comme ${isPaid ? 'non paye' : 'paye'}
-            </button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function togglePaymentStatus(idx) {
-      const row = rosterRegistrations[idx];
-      if (!row) return;
-
-      const newStatus = row.status === 'paye' ? 'non_paye' : 'paye';
-      const { error } = await supabaseClient.from('registrations').update({ status: newStatus }).eq('id', row.id);
-
-      if (error) {
-        showToast("Erreur : action réservée aux administrateurs.");
-        return;
-      }
-
-      showToast("Statut de paiement mis à jour !");
-      renderUsersTable();
-    }
-  </script>
-</body>
-</html>) {
       if (idx < sharedData.adminMedia.length) {
         sharedData.adminMedia.splice(idx, 1);
         saveSharedState();
