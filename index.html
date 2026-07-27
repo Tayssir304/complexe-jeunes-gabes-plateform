@@ -1123,6 +1123,19 @@
 
   <!-- SCRIPT LOGIQUE ET INTERACTIVITÉ DE L'APPLICATION -->
   <script>
+    // Échappe le HTML pour empêcher toute injection de script (XSS) via des
+    // données saisies par les utilisateurs (noms, messages, descriptions, etc.)
+    // avant de les insérer dans le DOM via innerHTML.
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     lucide.createIcons();
 
     /* ANIMATION CANVAS EN ARRIÈRE-PLAN */

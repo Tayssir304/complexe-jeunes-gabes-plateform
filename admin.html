@@ -712,10 +712,25 @@
     }
 
     // HELPER TO CONVERT TEXT WITH LINKS TO CLICKABLE HTML
+    // Échappe le HTML pour empêcher toute injection de script (XSS) via des
+    // données saisies par les utilisateurs (noms, messages, descriptions, etc.)
+    // avant de les insérer dans le DOM via innerHTML.
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function formatMessageText(text) {
       if (!text) return '';
+      const escaped = escapeHtml(text);
       const urlRegex = /(https?:\/\/[^\s]+)/g;
-      return text.replace(urlRegex, function(url) {
+      return escaped.replace(urlRegex, function(url) {
+        // url is now HTML-escaped; safe to use in both the href and the label.
         return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
       });
     }
@@ -1099,14 +1114,14 @@
         item.onclick = () => selectDirectUser(c.email);
         const initial = (c.name || '?').trim().charAt(0).toUpperCase();
         item.innerHTML = `
-          <div class="dc-avatar">${initial}</div>
+          <div class="dc-avatar">${escapeHtml(initial)}</div>
           <div class="dc-conv-body">
             <div class="dc-conv-name-row">
-              <span class="dc-conv-name">${c.name}</span>
+              <span class="dc-conv-name">${escapeHtml(c.name)}</span>
               ${unread > 0 ? `<span class="dc-unread-dot">${unread > 9 ? '9+' : unread}</span>` : ''}
             </div>
-            ${c.club ? `<div class="dc-conv-club">${c.club}</div>` : ''}
-            <div class="dc-conv-preview">${c.lastText}</div>
+            ${c.club ? `<div class="dc-conv-club">${escapeHtml(c.club)}</div>` : ''}
+            <div class="dc-conv-preview">${escapeHtml(c.lastText)}</div>
           </div>
         `;
         listEl.appendChild(item);
@@ -1147,15 +1162,15 @@
           bodyHtml += `<div style="font-size:0.88rem; margin-top:0.2rem;">${formatMessageText(msg.text)}</div>`;
         }
         if (msg.image) {
-          bodyHtml += `<img src="${msg.image}" class="msg-img-preview" alt="Image envoyée" />`;
+          bodyHtml += `<img src="${escapeHtml(msg.image)}" class="msg-img-preview" alt="Image envoyée" />`;
         }
 
         div.innerHTML = `
           <div class="msg-content">
-            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${msg.author} (${msg.role})</div>
+            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${escapeHtml(msg.author)} (${escapeHtml(msg.role)})</div>
             ${bodyHtml}
           </div>
-          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteDirectMsg('${email}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteDirectMsg('${escapeHtml(email)}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
         `;
         feed.appendChild(div);
       });
@@ -1280,15 +1295,15 @@
           bodyHtml += `<div style="font-size:0.88rem; margin-top:0.2rem;">${formatMessageText(msg.text)}</div>`;
         }
         if (msg.image) {
-          bodyHtml += `<img src="${msg.image}" class="msg-img-preview" alt="Image envoyée" />`;
+          bodyHtml += `<img src="${escapeHtml(msg.image)}" class="msg-img-preview" alt="Image envoyée" />`;
         }
 
         div.innerHTML = `
           <div class="msg-content">
-            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${msg.author} (${msg.role || 'Membre'})</div>
+            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${escapeHtml(msg.author)} (${escapeHtml(msg.role || 'Membre')})</div>
             ${bodyHtml}
           </div>
-          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteChannelMsg('${channel}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteChannelMsg('${escapeHtml(channel)}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
         `;
         feed.appendChild(div);
       });
@@ -1408,11 +1423,11 @@
         const chClub = (data.channelClubs && data.channelClubs[ch]) || 'Tous';
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><strong># ${ch}</strong></td>
-          <td>${clubLabels[chClub] || chClub}</td>
+          <td><strong># ${escapeHtml(ch)}</strong></td>
+          <td>${escapeHtml(clubLabels[chClub] || chClub)}</td>
           <td>${count} message(s)</td>
           <td>
-            ${(ch !== 'general') ? `<button class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.75rem;" onclick="deleteChannel('${ch}')"><i data-lucide="trash-2" style="width:14px;"></i> Supprimer</button>` : '<span style="color:var(--text-muted); font-size:0.8rem;">Salon protégé</span>'}
+            ${(ch !== 'general') ? `<button class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.75rem;" onclick="deleteChannel('${escapeHtml(ch)}')"><i data-lucide="trash-2" style="width:14px;"></i> Supprimer</button>` : '<span style="color:var(--text-muted); font-size:0.8rem;">Salon protégé</span>'}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1465,9 +1480,9 @@
         const clubsStr = (u.clubs || []).join(', ') || 'Non renseigné';
 
         tr.innerHTML = `
-          <td><strong>${u.full_name}</strong></td>
-          <td>${u.email || 'Non renseigné'}</td>
-          <td>${clubsStr}</td>
+          <td><strong>${escapeHtml(u.full_name)}</strong></td>
+          <td>${escapeHtml(u.email || 'Non renseigné')}</td>
+          <td>${escapeHtml(clubsStr)}</td>
           <td><span style="background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem;">Membre</span></td>
           <td>
             <span style="padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem; background:${isPaid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${isPaid ? '#34d399' : '#f87171'};">
@@ -1617,10 +1632,10 @@
         };
 
         card.innerHTML = `
-          <img src="${item.image}" alt="Photo en attente" class="admin-gallery-photo-img" />
+          <img src="${escapeHtml(item.image)}" alt="Photo en attente" class="admin-gallery-photo-img" />
           <div class="admin-gallery-photo-info">
-            <div class="admin-gallery-photo-desc">${item.description || '(aucune description)'}</div>
-            <div class="admin-gallery-photo-author">${clubLabels[item.club] || item.club} • Par ${item.author}</div>
+            <div class="admin-gallery-photo-desc">${escapeHtml(item.description) || '(aucune description)'}</div>
+            <div class="admin-gallery-photo-author">${escapeHtml(clubLabels[item.club] || item.club)} • Par ${escapeHtml(item.author)}</div>
             <div style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
               <button class="admin-card-btn" style="background: rgba(16, 185, 129, 0.3); color: #34d399; flex:1;" onclick="approveGalleryPhoto(${idx})"> Approuver</button>
               <button class="admin-card-btn delete" style="flex:1;" onclick="rejectGalleryPhoto(${idx})"> Rejeter</button>
@@ -1668,10 +1683,10 @@
         };
 
         card.innerHTML = `
-          <img src="${item.image}" alt="Photo approuvée" class="admin-gallery-photo-img" />
+          <img src="${escapeHtml(item.image)}" alt="Photo approuvée" class="admin-gallery-photo-img" />
           <div class="admin-gallery-photo-info">
-            <div class="admin-gallery-photo-desc">${item.description || '(aucune description)'}</div>
-            <div class="admin-gallery-photo-author">${clubLabels[item.club] || item.club} • Par ${item.author}</div>
+            <div class="admin-gallery-photo-desc">${escapeHtml(item.description) || '(aucune description)'}</div>
+            <div class="admin-gallery-photo-author">${escapeHtml(clubLabels[item.club] || item.club)} • Par ${escapeHtml(item.author)}</div>
             <button class="admin-card-btn delete" style="width: 100%; margin-top: 0.5rem;" onclick="removeApprovedPhoto(${idx})">Supprimer de la galerie</button>
           </div>
         `;
