@@ -1590,6 +1590,35 @@
       if (submitBtn) submitBtn.disabled = true;
 
       try {
+        // 0) Vérifier que l'adresse email est réellement déliverable (MX + SMTP réel,
+        // pas juste un format valide) via une fonction serverless Vercel qui garde
+        // la clé API secrète côté serveur (jamais exposée dans le navigateur).
+        if (submitBtn) submitBtn.textContent = 'Vérification de l\'email...';
+        let emailCheck = { valid: true };
+        try {
+          const verifyRes = await fetch('/api/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          });
+          emailCheck = await verifyRes.json();
+        } catch (verifyErr) {
+          console.error('Email verification request failed:', verifyErr);
+          // Si l'appel échoue (ex: fonction pas encore déployée), on n'empêche pas
+          // l'inscription — la confirmation par email reste un filet de sécurité.
+        }
+
+        if (emailCheck.valid === false) {
+          const reasons = {
+            disposable_email: "Les adresses email jetables/temporaires ne sont pas acceptées.",
+            undeliverable: "Cette adresse email n'existe pas ou n'est pas joignable.",
+            invalid_format: "Le format de l'adresse email est invalide."
+          };
+          alert(reasons[emailCheck.reason] || "Cette adresse email semble invalide ou inexistante. Merci d'utiliser une adresse email réelle.");
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "S'inscrire"; }
+          return;
+        }
+
         // 1) Créer le compte dans Supabase Auth (le trigger "on_auth_user_created" crée automatiquement la ligne dans "profiles")
         // emailRedirectTo pointe vers cette page : Supabase envoie un vrai email de
         // confirmation à l'adresse saisie. Si l'adresse n'existe pas réellement,
