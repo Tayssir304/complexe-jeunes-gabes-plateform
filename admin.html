@@ -1645,7 +1645,7 @@
           <div style="flex:1;">
             ${card.label ? `<span class="admin-trello-card-tag">${escapeHtml(card.label)}</span>` : ''}
             <div class="admin-trello-card-title">${escapeHtml(card.title)}</div>
-            <div style="font-size:0.72rem; color:${assigneeName ? 'var(--text-muted)' : 'rgba(148,163,184,0.6)'}; margin-top:0.3rem; font-style:${assigneeName ? 'normal' : 'italic'};">👤 ${assigneeName ? escapeHtml(assigneeName) : 'Non assigné'}${dueLabel}</div>
+            ${assigneeName ? `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.3rem;">👤 ${escapeHtml(assigneeName)}${dueLabel}</div>` : (dueLabel ? `<div style="margin-top:0.3rem;">${dueLabel}</div>` : '')}
           </div>
           <div class="admin-card-actions">
             ${listIdx > 0 ? `<button class="admin-card-btn" onclick="moveAdminCard('${card.id}', '${adminTrelloLists[listIdx - 1].id}')" title="Déplacer à gauche">←</button>` : ''}

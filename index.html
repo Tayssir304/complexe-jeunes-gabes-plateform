@@ -237,7 +237,7 @@
     .tab-btn.active { background: var(--accent-solid); color: white; }
 
     .tab-content { flex: 1; display: none; overflow: hidden; }
-    .tab-content.active { display: flex; flex-direction: column; }
+    .tab-content.active { display: flex; }
 
     /* Chat & Images */
     .chat-container { flex: 1; display: flex; flex-direction: column; height: 100%; }
@@ -260,23 +260,12 @@
 
     /* Trello Board */
     .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; }
-    .trello-club-tabs {
-      display: flex; align-items: center; gap: 0.35rem; padding: 0.9rem 1.5rem;
-      border-bottom: 1px solid var(--card-border); overflow-x: auto; overflow-y: hidden;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;
-    }
-    .trello-club-tabs::-webkit-scrollbar { display: none; }
-    .trello-club-tab {
-      background: transparent; border: 1px solid transparent; color: var(--text-muted);
-      padding: 0.45rem 0.9rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.15s, color 0.15s;
-    }
-    .trello-club-tab:hover { background: rgba(255,255,255,0.06); color: var(--text-main); }
-    .trello-club-tab.active { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border-color: rgba(99, 102, 241, 0.35); }
+    .trello-club-tabs { display: flex; gap: 0.5rem; padding: 1rem 1.5rem 0; flex-wrap: wrap; }
+    .trello-club-tab { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .trello-club-tab.active { background: var(--accent-gradient); color: white; border-color: transparent; }
     .kanban-card-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
     .kanban-card-tag { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
     .kanban-card-assignee { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.25rem; }
-    .kanban-card-assignee.unassigned { background: rgba(255,255,255,0.04); color: rgba(148, 163, 184, 0.6); font-style: italic; }
     .kanban-card-due { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.25rem; }
     .kanban-card-due.overdue { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
     .kanban-card-due.soon { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
@@ -1542,6 +1531,7 @@
       renderChannels();
       renderChatMessages();
       initTrelloTab();
+      subscribeToPaymentStatus(currentUser.id);
       populateMemberSearchClubFilter();
       initNotifications();
     }
@@ -1906,7 +1896,7 @@
     });
 
     /* GESTION DU PROFIL UTILISATEUR */
-    function openProfileModal() {
+    async function openProfileModal() {
       const dropdown = document.getElementById('settingsDropdown');
       if (dropdown) dropdown.classList.remove('active');
       const modal = document.getElementById('profileModal');
@@ -1915,13 +1905,20 @@
       document.getElementById('profileNameInput').value = currentUser.name;
       document.getElementById('profileRoleText').innerText = currentUser.role || 'Membre';
 
-      const statusEl = document.getElementById('profilePaymentStatus');
-      const statusVal = currentUser.status || "non paye";
-      statusEl.innerText = statusVal;
-      if (statusVal === "paye" || statusVal === "payé") {
-        statusEl.className = "status-badge paid";
-      } else {
-        statusEl.className = "status-badge";
+      renderProfilePaymentStatus();
+
+      // Va rechercher le statut le plus récent en base (au cas où un admin l'aurait
+      // changé depuis la dernière connexion) pour ne jamais afficher une valeur périmée.
+      if (currentUser.id) {
+        const { data: regRow } = await supabaseClient
+          .from('registrations').select('status')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(1).single();
+        if (regRow) {
+          currentUser.status = regRow.status === 'paye' ? 'paye' : 'non paye';
+          renderProfilePaymentStatus();
+        }
       }
 
       const avatarText = document.getElementById('profileAvatarText');
@@ -1951,6 +1948,39 @@
     }
 
     function closeProfileModal() { document.getElementById('profileModal').classList.remove('open'); }
+
+    function renderProfilePaymentStatus() {
+      const statusEl = document.getElementById('profilePaymentStatus');
+      if (!statusEl) return;
+      const statusVal = currentUser.status || "non paye";
+      statusEl.innerText = statusVal;
+      statusEl.className = (statusVal === "paye" || statusVal === "payé") ? "status-badge paid" : "status-badge";
+    }
+
+    // Écoute en temps réel les changements de statut de paiement (table "registrations")
+    // pour ce membre : si un admin marque "payé" pendant que le membre est déjà sur la
+    // page, le badge se met à jour immédiatement, sans avoir besoin de se reconnecter.
+    let paymentStatusChannel = null;
+    function subscribeToPaymentStatus(userId) {
+      if (!userId) return;
+      if (paymentStatusChannel) {
+        supabaseClient.removeChannel(paymentStatusChannel);
+        paymentStatusChannel = null;
+      }
+      paymentStatusChannel = supabaseClient
+        .channel(`registrations-status-${userId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'registrations', filter: `user_id=eq.${userId}`
+        }, (payload) => {
+          const newStatus = payload.new.status === 'paye' ? 'paye' : 'non paye';
+          if (newStatus !== currentUser.status) {
+            currentUser.status = newStatus;
+            renderProfilePaymentStatus();
+            if (newStatus === 'paye') showToast('Votre cotisation a été marquée comme payée !');
+          }
+        })
+        .subscribe();
+    }
 
     function syncCurrentUserToRegisteredUsers() {
       const idx = sharedData.registeredUsers.findIndex(u => u.email === currentUser.email);
@@ -2704,7 +2734,7 @@
           <div style="font-size:0.88rem; font-weight:600;">${escapeHtml(card.title)}</div>
           ${card.description ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;">${escapeHtml(card.description)}</div>` : ''}
           <div class="kanban-card-meta">
-            <span class="kanban-card-assignee${assigneeName ? '' : ' unassigned'}"><i data-lucide="user" style="width:11px;"></i> ${assigneeName ? escapeHtml(assigneeName) : 'Non assigné'}</span>
+            ${assigneeName ? `<span class="kanban-card-assignee"><i data-lucide="user" style="width:11px;"></i> ${escapeHtml(assigneeName)}</span>` : ''}
             ${dueBadge}
           </div>
         </div>
