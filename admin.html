@@ -622,10 +622,15 @@
     // On tente une lecture protégée par RLS : si la policy bloque, l'utilisateur
     // n'est pas admin. Adapte cette fonction si tu as une table/role dédiée.
     async function checkIsAdmin() {
-      const { error } = await supabaseClient
-        .from('registrations')
-        .select('id', { count: 'exact', head: true });
-      return !error;
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return false;
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+      if (error || !profile) return false;
+      return !!profile.is_admin;
     }
 
     // Repère une réponse "rate limited" renvoyée par Supabase Auth (protection serveur réelle)

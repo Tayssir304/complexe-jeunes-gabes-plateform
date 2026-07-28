@@ -1702,8 +1702,36 @@
         if (error) throw error;
 
         const userId = data.user.id;
-        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+        let { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
         const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+
+        // Auto-réparation : si le lien club_id / profile_clubs n'a pas été fait au moment de
+        // l'inscription (ex: confirmation d'email activée => pas de session active à ce moment-là,
+        // donc les policies RLS bloquaient l'écriture), on le refait ici, maintenant que
+        // l'utilisateur est bien authentifié (auth.uid() est disponible pour les policies RLS).
+        if (profile && !profile.club_id && regRow && regRow.clubs && regRow.clubs.length > 0) {
+          try {
+            const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
+            const boardIdByName = {};
+            (boardsRows || []).forEach(b => boardIdByName[b.name] = b.id);
+            const primaryBoardId = boardIdByName[CLUB_NAME_TO_BOARD[regRow.clubs[0]] || regRow.clubs[0]] || null;
+
+            if (primaryBoardId) {
+              await supabaseClient.from('profiles').update({ club_id: primaryBoardId }).eq('id', userId);
+              profile.club_id = primaryBoardId;
+            }
+
+            const clubRows = regRow.clubs
+              .map(c => boardIdByName[CLUB_NAME_TO_BOARD[c] || c])
+              .filter(Boolean)
+              .map(clubId => ({ profile_id: userId, club_id: clubId }));
+            if (clubRows.length) {
+              await supabaseClient.from('profile_clubs').insert(clubRows);
+            }
+          } catch (linkErr) {
+            console.error('Auto-réparation du club_id échouée :', linkErr);
+          }
+        }
 
         currentUser = {
           id: userId,
@@ -2572,6 +2600,8 @@
       renderTrelloClubTabs();
       if (trelloBoardsCache.length > 0) {
         await switchTrelloBoard(trelloBoardsCache[0].id);
+      } else if (container) {
+        container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte. Si vous venez de vous inscrire, essayez de vous déconnecter puis reconnecter. Sinon, contactez un administrateur.</p>`;
       }
     }
 
