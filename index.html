@@ -260,6 +260,15 @@
 
     /* Trello Board */
     .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; }
+    .trello-club-tabs { display: flex; gap: 0.5rem; padding: 1rem 1.5rem 0; flex-wrap: wrap; }
+    .trello-club-tab { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .trello-club-tab.active { background: var(--accent-gradient); color: white; border-color: transparent; }
+    .kanban-card-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+    .kanban-card-tag { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+    .kanban-card-assignee { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.25rem; }
+    .kanban-card-due { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.25rem; }
+    .kanban-card-due.overdue { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    .kanban-card-due.soon { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
     .kanban-col { width: 300px; min-width: 300px; background: var(--trello-col); border: 1px solid var(--card-border); border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; max-height: 100%; }
     .kanban-header { font-weight: 700; font-size: 0.95rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
     .kanban-cards { display: flex; flex-direction: column; gap: 0.8rem; overflow-y: auto; flex: 1; min-height: 50px; }
@@ -728,35 +737,11 @@
           </div>
         </div>
 
-        <!-- ONGLET 2: TABLEAU KANBAN (TRELLO) -->
+        <!-- ONGLET 2: TABLEAU KANBAN (TRELLO), organisé par club -->
         <div class="tab-content" id="tabBoard">
-          <div class="kanban-board">
-            <div class="kanban-col">
-              <div class="kanban-header">
-                <span> À FAIRE</span>
-                <span style="font-size:0.75rem; color:var(--text-muted);" id="countTodo">0</span>
-              </div>
-              <div class="kanban-cards" id="colTodo"></div>
-              <button class="add-card-btn" onclick="addNewCard('colTodo')">+ Ajouter une carte</button>
-            </div>
-
-            <div class="kanban-col">
-              <div class="kanban-header">
-                <span> EN COURS</span>
-                <span style="font-size:0.75rem; color:var(--text-muted);" id="countProgress">0</span>
-              </div>
-              <div class="kanban-cards" id="colProgress"></div>
-              <button class="add-card-btn" onclick="addNewCard('colProgress')">+ Ajouter une carte</button>
-            </div>
-
-            <div class="kanban-col">
-              <div class="kanban-header">
-                <span> TERMINÉ</span>
-                <span style="font-size:0.75rem; color:var(--text-muted);" id="countDone">0</span>
-              </div>
-              <div class="kanban-cards" id="colDone"></div>
-              <button class="add-card-btn" onclick="addNewCard('colDone')">+ Ajouter une carte</button>
-            </div>
+          <div class="trello-club-tabs" id="trelloClubTabs"></div>
+          <div class="kanban-board" id="trelloBoardContainer">
+            <!-- Les colonnes (À faire / En cours / Terminé) sont générées dynamiquement par club -->
           </div>
         </div>
 
@@ -1329,8 +1314,7 @@
       sharedData = loadSharedState();
       renderChannels();
       renderChatMessages();
-      renderTrelloBoard();
-      
+
       const match = sharedData.registeredUsers.find(u => u.email === currentUser.email);
       if (match) {
         currentUser.status = match.status;
@@ -1546,7 +1530,7 @@
       updateUserHeaderUI();
       renderChannels();
       renderChatMessages();
-      renderTrelloBoard();
+      initTrelloTab();
       populateMemberSearchClubFilter();
       initNotifications();
     }
@@ -2350,6 +2334,7 @@
         document.getElementById('btnTabBoard').classList.add('active');
         document.getElementById('tabBoard').classList.add('active');
         workspaceLayout.classList.add('no-sidebar');
+        if (trelloActiveBoardId) { loadTrelloBoardData(); } else { initTrelloTab(); }
       } else if (tab === 'gallery') {
         document.getElementById('btnTabGallery').classList.add('active');
         document.getElementById('tabGallery').classList.add('active');
@@ -2561,128 +2546,227 @@
       }
     }
 
-    function renderTrelloBoard() {
-      const cols = ['colTodo', 'colProgress', 'colDone'];
-      cols.forEach(colKey => {
-        const container = document.getElementById(colKey);
-        const countEl = document.getElementById('count' + colKey.replace('col', ''));
-        if (!container) return;
-        
-        container.innerHTML = '';
-        const cards = sharedData.trello[colKey] || [];
-        if (countEl) countEl.innerText = cards.length;
+    /* ===================== TABLEAU TRELLO PAR CLUB (Supabase: boards / lists / cards) ===================== */
+    let trelloBoardsCache = [];     // [{id, name}] clubs accessibles à l'utilisateur
+    let trelloActiveBoardId = null;
+    let trelloListsCache = [];      // lists de trelloActiveBoardId
+    let trelloCardsCache = [];      // cards de ces lists, avec profils jointes
+    let trelloMembersCache = [];    // membres du club actif, pour le select "Assigné à"
 
-        cards.forEach((card, idx) => {
-          const cardDiv = document.createElement('div');
-          cardDiv.className = 'kanban-card';
-          cardDiv.draggable = true;
-          cardDiv.dataset.col = colKey;
-          cardDiv.dataset.idx = idx;
-          cardDiv.innerHTML = `
-            <div class="card-actions">
-              ${colKey !== 'colTodo' ? `<button class="card-btn" onclick="moveCard('${colKey}', ${idx}, -1)" title="Déplacer à gauche"><i data-lucide="arrow-left" style="width:12px;"></i></button>` : ''}
-              ${colKey !== 'colDone' ? `<button class="card-btn" onclick="moveCard('${colKey}', ${idx}, 1)" title="Déplacer à droite"><i data-lucide="arrow-right" style="width:12px;"></i></button>` : ''}
-              <button class="card-btn delete" onclick="deleteCard('${colKey}', ${idx})" title="Supprimer"><i data-lucide="trash-2" style="width:12px;"></i></button>
+    async function initTrelloTab() {
+      const container = document.getElementById('trelloBoardContainer');
+      if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Chargement du tableau...</p>`;
+
+      // Un membre voit les clubs auxquels il appartient ; l'admin (accès direct à ce workspace) voit tout.
+      const myClubNames = (currentUser.clubs || [currentUser.club]).filter(Boolean).map(c => CLUB_NAME_TO_BOARD[c] || c);
+
+      const { data: boards, error } = await supabaseClient.from('boards').select('id, name').order('name');
+      if (error) {
+        if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Impossible de charger les clubs : ${escapeHtml(error.message)}</p>`;
+        return;
+      }
+
+      trelloBoardsCache = (boards || []).filter(b => myClubNames.includes(b.name));
+      if (trelloBoardsCache.length === 0) trelloBoardsCache = boards || []; // secours si aucune correspondance trouvée
+
+      renderTrelloClubTabs();
+      if (trelloBoardsCache.length > 0) {
+        await switchTrelloBoard(trelloBoardsCache[0].id);
+      }
+    }
+
+    function renderTrelloClubTabs() {
+      const tabsEl = document.getElementById('trelloClubTabs');
+      if (!tabsEl) return;
+      tabsEl.innerHTML = trelloBoardsCache.map(b => `
+        <button class="trello-club-tab ${b.id === trelloActiveBoardId ? 'active' : ''}" onclick="switchTrelloBoard('${b.id}')">${escapeHtml(b.name)}</button>
+      `).join('');
+    }
+
+    async function switchTrelloBoard(boardId) {
+      trelloActiveBoardId = boardId;
+      renderTrelloClubTabs();
+      await loadAssigneesForClub(boardId);
+      await loadTrelloBoardData();
+    }
+
+    async function loadTrelloBoardData() {
+      const container = document.getElementById('trelloBoardContainer');
+      if (!trelloActiveBoardId) { if (container) container.innerHTML = ''; return; }
+
+      const { data: lists, error: listsErr } = await supabaseClient
+        .from('lists').select('id, name, position').eq('board_id', trelloActiveBoardId).order('position');
+      if (listsErr) {
+        if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Erreur de chargement : ${escapeHtml(listsErr.message)}</p>`;
+        return;
+      }
+      trelloListsCache = lists || [];
+      const listIds = trelloListsCache.map(l => l.id);
+
+      let cards = [];
+      if (listIds.length > 0) {
+        const { data: cardsData, error: cardsErr } = await supabaseClient
+          .from('cards')
+          .select('id, list_id, title, description, assignee, assignee_id, due_date, label, position, profiles:assignee_id(display_name)')
+          .in('list_id', listIds)
+          .order('position');
+        if (!cardsErr) cards = cardsData || [];
+      }
+      trelloCardsCache = cards;
+      renderTrelloColumns();
+    }
+
+    function renderTrelloColumns() {
+      const container = document.getElementById('trelloBoardContainer');
+      if (!container) return;
+
+      container.innerHTML = trelloListsCache.map(list => {
+        const listCards = trelloCardsCache.filter(c => c.list_id === list.id);
+        return `
+          <div class="kanban-col">
+            <div class="kanban-header">
+              <span>${escapeHtml(list.name.toUpperCase())}</span>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${listCards.length}</span>
             </div>
-            <span class="card-tag">${card.tag || 'Tâche'}</span>
-            <div style="font-size:0.88rem; font-weight:600;">${card.title}</div>
-          `;
-          
-          // Drag events
-          cardDiv.addEventListener('dragstart', handleCardDragStart);
-          cardDiv.addEventListener('dragend', handleCardDragEnd);
-          
-          container.appendChild(cardDiv);
-        });
-        
-        // Drop zone events for columns
-        container.addEventListener('dragover', handleColumnDragOver);
-        container.addEventListener('drop', handleColumnDrop);
-        container.addEventListener('dragleave', handleColumnDragLeave);
-      });
+            <div class="kanban-cards" id="trelloCol_${list.id}">
+              ${listCards.map(card => renderTrelloCardHtml(card, list)).join('')}
+            </div>
+            <button class="add-card-btn" onclick="openNewCardModal('${list.id}')">+ Ajouter une carte</button>
+          </div>
+        `;
+      }).join('');
+
       lucide.createIcons();
     }
 
-    let draggedCard = null;
-
-    function handleCardDragStart(e) {
-      draggedCard = e.target.closest('.kanban-card');
-      draggedCard.style.opacity = '0.5';
-      e.dataTransfer.effectAllowed = 'move';
-    }
-
-    function handleCardDragEnd(e) {
-      if (draggedCard) {
-        draggedCard.style.opacity = '1';
+    function renderTrelloCardHtml(card, list) {
+      const listIdx = trelloListsCache.findIndex(l => l.id === list.id);
+      const assigneeName = card.profiles?.display_name || card.assignee || '';
+      let dueBadge = '';
+      if (card.due_date) {
+        const due = new Date(card.due_date + 'T23:59:59');
+        const now = new Date();
+        const diffDays = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+        const cls = diffDays < 0 ? 'overdue' : (diffDays <= 2 ? 'soon' : '');
+        const label = new Date(card.due_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+        dueBadge = `<span class="kanban-card-due ${cls}"><i data-lucide="calendar" style="width:11px;"></i> ${label}</span>`;
       }
-      draggedCard = null;
+
+      return `
+        <div class="kanban-card">
+          <div class="card-actions">
+            ${listIdx > 0 ? `<button class="card-btn" onclick="moveCardToList('${card.id}', '${trelloListsCache[listIdx - 1].id}')" title="Déplacer à gauche"><i data-lucide="arrow-left" style="width:12px;"></i></button>` : ''}
+            ${listIdx < trelloListsCache.length - 1 ? `<button class="card-btn" onclick="moveCardToList('${card.id}', '${trelloListsCache[listIdx + 1].id}')" title="Déplacer à droite"><i data-lucide="arrow-right" style="width:12px;"></i></button>` : ''}
+            <button class="card-btn delete" onclick="deleteTrelloCard('${card.id}')" title="Supprimer"><i data-lucide="trash-2" style="width:12px;"></i></button>
+          </div>
+          ${card.label ? `<span class="card-tag">${escapeHtml(card.label)}</span>` : ''}
+          <div style="font-size:0.88rem; font-weight:600;">${escapeHtml(card.title)}</div>
+          ${card.description ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;">${escapeHtml(card.description)}</div>` : ''}
+          <div class="kanban-card-meta">
+            ${assigneeName ? `<span class="kanban-card-assignee"><i data-lucide="user" style="width:11px;"></i> ${escapeHtml(assigneeName)}</span>` : ''}
+            ${dueBadge}
+          </div>
+        </div>
+      `;
     }
 
-    function handleColumnDragOver(e) {
+    // Charge les membres du club sélectionné pour peupler le select "Assigné à"
+    // (membres dont le club principal correspond, ou inscrits via profile_clubs pour les multi-clubs)
+    async function loadAssigneesForClub(boardId) {
+      if (!boardId) return;
+      const select = document.getElementById('newCardAssignee');
+
+      const [{ data: primaryMembers }, { data: extraLinks }] = await Promise.all([
+        supabaseClient.from('profiles').select('id, display_name').eq('club_id', boardId),
+        supabaseClient.from('profile_clubs').select('profile_id').eq('club_id', boardId)
+      ]);
+
+      let extraMembers = [];
+      const extraIds = (extraLinks || []).map(l => l.profile_id);
+      if (extraIds.length > 0) {
+        const { data } = await supabaseClient.from('profiles').select('id, display_name').in('id', extraIds);
+        extraMembers = data || [];
+      }
+
+      const merged = [...(primaryMembers || []), ...extraMembers];
+      const seen = new Set();
+      trelloMembersCache = merged.filter(m => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+
+      if (select) {
+        select.innerHTML = '<option value="">Non assigné</option>' +
+          trelloMembersCache.map(m => `<option value="${m.id}">${escapeHtml(m.display_name || 'Membre')}</option>`).join('');
+      }
+    }
+
+    function openNewCardModal(listId) {
+      document.getElementById('newCardListId').value = listId;
+      const clubSelect = document.getElementById('newCardClub');
+      clubSelect.innerHTML = trelloBoardsCache.map(b => `<option value="${b.id}" ${b.id === trelloActiveBoardId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
+      document.getElementById('newCardTitle').value = '';
+      document.getElementById('newCardDescription').value = '';
+      document.getElementById('newCardDueDate').value = '';
+      loadAssigneesForClub(clubSelect.value);
+      document.getElementById('newCardModal').classList.add('open');
+      lucide.createIcons();
+    }
+
+    function closeNewCardModal() {
+      document.getElementById('newCardModal').classList.remove('open');
+    }
+
+    async function handleCreateCardSubmit(e) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
-    }
-
-    function handleColumnDragLeave(e) {
-      if (e.currentTarget === e.target) {
-        e.currentTarget.style.background = '';
-      }
-    }
-
-    function handleColumnDrop(e) {
-      e.preventDefault();
-      e.currentTarget.style.background = '';
-      
-      if (!draggedCard) return;
-
-      const fromCol = draggedCard.dataset.col;
-      const fromIdx = parseInt(draggedCard.dataset.idx);
-      const toCol = e.currentTarget.id;
-
-      if (fromCol && fromIdx !== undefined && toCol) {
-        if (sharedData.trello[fromCol] && sharedData.trello[fromCol][fromIdx]) {
-          const [card] = sharedData.trello[fromCol].splice(fromIdx, 1);
-          if (!sharedData.trello[toCol]) sharedData.trello[toCol] = [];
-          sharedData.trello[toCol].push(card);
-          saveSharedState();
-          renderTrelloBoard();
-        }
-      }
-    }
-
-    function addNewCard(colKey) {
-      const title = prompt("Titre de la nouvelle tâche :");
+      const clubId = document.getElementById('newCardClub').value;
+      const title = document.getElementById('newCardTitle').value.trim();
+      const description = document.getElementById('newCardDescription').value.trim();
+      const assigneeId = document.getElementById('newCardAssignee').value || null;
+      const dueDate = document.getElementById('newCardDueDate').value || null;
       if (!title) return;
-      const tag = prompt("Tag / Catégorie (ex: Dev, Formation, Urgent) :", "Général") || "Général";
 
-      if (!sharedData.trello[colKey]) sharedData.trello[colKey] = [];
-      sharedData.trello[colKey].push({ title, tag });
-      saveSharedState();
-      renderTrelloBoard();
-    }
+      // La carte est toujours créée dans la première colonne (À faire) du club choisi,
+      // même si le "+" a été cliqué depuis une autre colonne.
+      const { data: lists } = await supabaseClient.from('lists').select('id, position').eq('board_id', clubId).order('position');
+      const targetList = (lists && lists[0]) || null;
+      if (!targetList) { alert("Ce club n'a pas encore de colonnes configurées."); return; }
 
-    function moveCard(fromCol, idx, direction) {
-      const colOrder = ['colTodo', 'colProgress', 'colDone'];
-      const currentIdx = colOrder.indexOf(fromCol);
-      const targetCol = colOrder[currentIdx + direction];
+      const assigneeName = assigneeId ? (trelloMembersCache.find(m => m.id === assigneeId)?.display_name || '') : '';
 
-      if (targetCol && sharedData.trello[fromCol][idx]) {
-        const [card] = sharedData.trello[fromCol].splice(idx, 1);
-        if (!sharedData.trello[targetCol]) sharedData.trello[targetCol] = [];
-        sharedData.trello[targetCol].push(card);
-        saveSharedState();
-        renderTrelloBoard();
+      const { error } = await supabaseClient.from('cards').insert({
+        list_id: targetList.id,
+        title, description,
+        assignee_id: assigneeId,
+        assignee: assigneeName,
+        due_date: dueDate,
+        created_by: currentUser.id
+      });
+
+      if (error) {
+        alert("Erreur lors de la création de la tâche : " + error.message);
+        return;
+      }
+
+      closeNewCardModal();
+      showToastMessage("Tâche créée !");
+      if (clubId === trelloActiveBoardId) {
+        await loadTrelloBoardData();
+      } else {
+        await switchTrelloBoard(clubId);
       }
     }
 
-    function deleteCard(colKey, idx) {
-      if (confirm("Supprimer cette carte ?")) {
-        sharedData.trello[colKey].splice(idx, 1);
-        saveSharedState();
-        renderTrelloBoard();
-      }
+    async function moveCardToList(cardId, newListId) {
+      const { error } = await supabaseClient.from('cards').update({ list_id: newListId }).eq('id', cardId);
+      if (error) { alert("Erreur : " + error.message); return; }
+      await loadTrelloBoardData();
     }
+
+    async function deleteTrelloCard(cardId) {
+      if (!confirm("Supprimer cette carte ?")) return;
+      const { error } = await supabaseClient.from('cards').delete().eq('id', cardId);
+      if (error) { alert("Erreur : " + error.message); return; }
+      await loadTrelloBoardData();
+    }
+
 
     /* FONCTIONS DU PANNEAU D'ADMINISTRATION */
     function openAdminPanel() {
@@ -3130,6 +3214,41 @@
       showToast("Statut de paiement mis à jour !");
       renderUsersTable();
     }
-  </script>
+  </script>  <!-- MODAL: NOUVELLE CARTE TRELLO -->
+  <div class="modal-overlay" id="newCardModal">
+    <div class="modal-card" style="max-width:500px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="font-size:1.3rem; font-weight:800;">Nouvelle tâche</h3>
+        <button onclick="closeNewCardModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <form onsubmit="handleCreateCardSubmit(event)">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Club</label>
+          <select id="newCardClub" class="form-input" required onchange="loadAssigneesForClub(this.value)"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Titre de la tâche</label>
+          <input type="text" id="newCardTitle" class="form-input" placeholder="Ex: Préparer l'affiche de l'événement" required maxlength="120" />
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Description (optionnel)</label>
+          <textarea id="newCardDescription" class="form-input" rows="3" placeholder="Détails de la tâche..." maxlength="500"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Assigné à</label>
+          <select id="newCardAssignee" class="form-input">
+            <option value="">Non assigné</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label>Date limite (optionnel)</label>
+          <input type="date" id="newCardDueDate" class="form-input" />
+        </div>
+        <input type="hidden" id="newCardListId" />
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Créer la tâche</button>
+      </form>
+    </div>
+  </div>
+
 </body>
 </html>
