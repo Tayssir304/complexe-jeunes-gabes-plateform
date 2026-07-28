@@ -2622,27 +2622,51 @@
     let trelloCardsCache = [];      // cards de ces lists, avec profils jointes
     let trelloMembersCache = [];    // membres du club actif, pour le select "Assigné à"
 
+    // Empêche un appel Supabase de rester bloqué indéfiniment (ex: projet Supabase en pause).
+    // Sans ce garde-fou, un await qui ne se résout jamais laisse le message
+    // "Chargement du tableau..." affiché pour toujours, sans aucune erreur visible.
+    function withTimeout(promise, ms = 10000) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Le serveur ne répond pas (délai dépassé).")), ms))
+      ]);
+    }
+
     async function initTrelloTab() {
       const container = document.getElementById('trelloBoardContainer');
       if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Chargement du tableau...</p>`;
 
-      // Un membre voit les clubs auxquels il appartient ; l'admin (accès direct à ce workspace) voit tout.
-      const myClubNames = (currentUser.clubs || [currentUser.club]).filter(Boolean).map(c => CLUB_NAME_TO_BOARD[c] || c);
+      try {
+        // Un membre voit les clubs auxquels il appartient ; l'admin (accès direct à ce workspace) voit tout.
+        const myClubNames = (currentUser.clubs || [currentUser.club]).filter(Boolean).map(c => CLUB_NAME_TO_BOARD[c] || c);
 
-      const { data: boards, error } = await supabaseClient.from('boards').select('id, name').order('name');
-      if (error) {
-        if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Impossible de charger les clubs : ${escapeHtml(error.message)}</p>`;
-        return;
-      }
+        const { data: boards, error } = await withTimeout(
+          supabaseClient.from('boards').select('id, name').order('name')
+        );
+        if (error) {
+          if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Impossible de charger les clubs : ${escapeHtml(error.message)}</p>`;
+          return;
+        }
 
-      trelloBoardsCache = (boards || []).filter(b => myClubNames.includes(b.name));
-      if (trelloBoardsCache.length === 0) trelloBoardsCache = boards || []; // secours si aucune correspondance trouvée
+        trelloBoardsCache = (boards || []).filter(b => myClubNames.includes(b.name));
+        if (trelloBoardsCache.length === 0) trelloBoardsCache = boards || []; // secours si aucune correspondance trouvée
 
-      renderTrelloClubTabs();
-      if (trelloBoardsCache.length > 0) {
-        await switchTrelloBoard(trelloBoardsCache[0].id);
-      } else if (container) {
-        container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte. Si vous venez de vous inscrire, essayez de vous déconnecter puis reconnecter. Sinon, contactez un administrateur.</p>`;
+        renderTrelloClubTabs();
+        if (trelloBoardsCache.length > 0) {
+          await switchTrelloBoard(trelloBoardsCache[0].id);
+        } else if (container) {
+          container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte. Si vous venez de vous inscrire, essayez de vous déconnecter puis reconnecter. Sinon, contactez un administrateur.</p>`;
+        }
+      } catch (err) {
+        // C'était la cause du blocage infini : une erreur ici n'était jamais rattrapée,
+        // donc le tableau restait sur "Chargement du tableau..." sans jamais rien afficher.
+        console.error('initTrelloTab error:', err);
+        if (container) {
+          container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">
+            Erreur lors du chargement du tableau : ${escapeHtml(err.message || String(err))}
+            <br><button class="btn btn-secondary" style="margin-top:0.75rem;" onclick="initTrelloTab()">Réessayer</button>
+          </p>`;
+        }
       }
     }
 
@@ -2657,7 +2681,15 @@
     async function switchTrelloBoard(boardId) {
       trelloActiveBoardId = boardId;
       renderTrelloClubTabs();
-      await loadAssigneesForClub(boardId);
+      // loadAssigneesForClub alimente le select "Assigné à" du modal ; ce n'est pas critique
+      // pour l'affichage du tableau, donc une erreur ici ne doit jamais empêcher
+      // loadTrelloBoardData() de s'exécuter (c'était le bug : un rejet non rattrapé ici
+      // bloquait tout le reste et laissait "Chargement du tableau..." indéfiniment).
+      try {
+        await loadAssigneesForClub(boardId);
+      } catch (err) {
+        console.error('loadAssigneesForClub error:', err);
+      }
       await loadTrelloBoardData();
     }
 
@@ -2665,26 +2697,39 @@
       const container = document.getElementById('trelloBoardContainer');
       if (!trelloActiveBoardId) { if (container) container.innerHTML = ''; return; }
 
-      const { data: lists, error: listsErr } = await supabaseClient
-        .from('lists').select('id, name, position').eq('board_id', trelloActiveBoardId).order('position');
-      if (listsErr) {
-        if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Erreur de chargement : ${escapeHtml(listsErr.message)}</p>`;
-        return;
-      }
-      trelloListsCache = lists || [];
-      const listIds = trelloListsCache.map(l => l.id);
+      try {
+        const { data: lists, error: listsErr } = await withTimeout(
+          supabaseClient.from('lists').select('id, name, position').eq('board_id', trelloActiveBoardId).order('position')
+        );
+        if (listsErr) {
+          if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Erreur de chargement : ${escapeHtml(listsErr.message)}</p>`;
+          return;
+        }
+        trelloListsCache = lists || [];
+        const listIds = trelloListsCache.map(l => l.id);
 
-      let cards = [];
-      if (listIds.length > 0) {
-        const { data: cardsData, error: cardsErr } = await supabaseClient
-          .from('cards')
-          .select('id, list_id, title, description, assignee, assignee_id, due_date, label, position, profiles:assignee_id(display_name)')
-          .in('list_id', listIds)
-          .order('position');
-        if (!cardsErr) cards = cardsData || [];
+        let cards = [];
+        if (listIds.length > 0) {
+          const { data: cardsData, error: cardsErr } = await withTimeout(
+            supabaseClient
+              .from('cards')
+              .select('id, list_id, title, description, assignee, assignee_id, due_date, label, position, profiles:assignee_id(display_name)')
+              .in('list_id', listIds)
+              .order('position')
+          );
+          if (!cardsErr) cards = cardsData || [];
+        }
+        trelloCardsCache = cards;
+        renderTrelloColumns();
+      } catch (err) {
+        console.error('loadTrelloBoardData error:', err);
+        if (container) {
+          container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">
+            Erreur de chargement : ${escapeHtml(err.message || String(err))}
+            <br><button class="btn btn-secondary" style="margin-top:0.75rem;" onclick="loadTrelloBoardData()">Réessayer</button>
+          </p>`;
+        }
       }
-      trelloCardsCache = cards;
-      renderTrelloColumns();
     }
 
     function renderTrelloColumns() {
@@ -2747,15 +2792,15 @@
       if (!boardId) return;
       const select = document.getElementById('newCardAssignee');
 
-      const [{ data: primaryMembers }, { data: extraLinks }] = await Promise.all([
+      const [{ data: primaryMembers }, { data: extraLinks }] = await withTimeout(Promise.all([
         supabaseClient.from('profiles').select('id, display_name').eq('club_id', boardId),
         supabaseClient.from('profile_clubs').select('profile_id').eq('club_id', boardId)
-      ]);
+      ]));
 
       let extraMembers = [];
       const extraIds = (extraLinks || []).map(l => l.profile_id);
       if (extraIds.length > 0) {
-        const { data } = await supabaseClient.from('profiles').select('id, display_name').in('id', extraIds);
+        const { data } = await withTimeout(supabaseClient.from('profiles').select('id, display_name').in('id', extraIds));
         extraMembers = data || [];
       }
 
