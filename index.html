@@ -359,6 +359,59 @@
     .media-info { padding: 0.6rem; display: flex; justify-content: space-between; align-items: center; }
 
     .toast { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 0.8rem 1.2rem; border-radius: 10px; font-weight: 600; box-shadow: 0 10px 20px rgba(0,0,0,0.4); display: none; z-index: 1100; }
+
+    /* ===================== RESPONSIVE / MOBILE ===================== */
+    .sidebar-toggle-btn { display: none; background: none; border: none; color: var(--text-main); cursor: pointer; padding: 0.2rem; align-items: center; }
+    .sidebar-backdrop { display: none; }
+
+    @media (max-width: 860px) {
+      /* --- Navbar & hero --- */
+      .navbar { flex-wrap: wrap; gap: 0.8rem; padding: 1rem; }
+      .nav-links { order: 3; width: 100%; justify-content: center; gap: 1.2rem; }
+      .nav-actions { gap: 0.5rem; }
+      .nav-actions .btn { padding: 0.6rem 1rem; font-size: 0.85rem; }
+      .hero { padding: 2.5rem 1.2rem 1.5rem; }
+      .hero > div[style*="display:flex"] { flex-direction: column; width: 100%; max-width: 320px; }
+      .hero > div[style*="display:flex"] .btn { width: 100%; justify-content: center; }
+      .section-container { padding: 0 1.2rem; margin: 2.5rem auto; }
+
+      /* --- Forms & modals --- */
+      .form-grid { grid-template-columns: 1fr; }
+      .inscription-container { padding: 1.5rem 1.2rem; }
+      .modal-card { padding: 1.5rem 1.2rem; max-width: 100%; width: calc(100% - 2rem); max-height: 90vh; overflow-y: auto; }
+      .profile-header-area { flex-direction: column; text-align: center; }
+      .profile-header-area > div[style*="flex:1"] { width: 100%; }
+      .profile-header-area > div[style*="display:flex"][style*="align-items:center"] { justify-content: center; }
+
+      /* --- Workspace: turn the fixed sidebar into a slide-in drawer --- */
+      .workspace-layout { grid-template-columns: 1fr !important; }
+      .sidebar-toggle-btn { display: inline-flex; }
+      .discord-sidebar {
+        position: fixed; top: 0; left: 0; height: 100vh; width: min(82vw, 300px);
+        z-index: 210; transform: translateX(-100%); transition: transform 0.25s ease;
+        box-shadow: 10px 0 30px rgba(0,0,0,0.4);
+      }
+      .discord-sidebar.mobile-open { transform: translateX(0); }
+      .sidebar-backdrop.active {
+        display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 205;
+      }
+      .workspace-nav { padding: 0.8rem 1rem; flex-wrap: wrap; gap: 0.6rem; }
+      .tab-switcher { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .tab-btn { white-space: nowrap; padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+      .chat-messages-area { padding: 1rem 0.8rem; }
+      .chat-input-bar { padding: 0.7rem 0.8rem; }
+      .kanban-board, .trello-board { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .kanban-col { width: 82vw; min-width: 240px; }
+      .media-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+
+    @media (max-width: 420px) {
+      .logo-text { font-size: 0.9rem; }
+      .logo-text span { font-size: 0.62rem; }
+      .hero-title { font-size: 1.7rem; }
+      .toast { left: 12px; right: 12px; bottom: 12px; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -635,10 +688,15 @@
         </div>
       </aside>
 
+      <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
       <!-- CONTENU PRINCIPAL DU WORKSPACE -->
       <main class="workspace-main">
         <div class="workspace-nav">
           <div style="display:flex; align-items:center; gap:0.5rem; font-weight:700;">
+            <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="openMobileSidebar()" title="Menu" aria-label="Ouvrir le menu">
+              <i data-lucide="menu" style="width:20px;"></i>
+            </button>
             <i data-lucide="hash" style="color:#818cf8;"></i>
             <span id="currentChannelHeader">general</span>
           </div>
@@ -1038,6 +1096,45 @@
           <input type="password" id="loginPass" class="form-input" placeholder="••••••••" required />
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Ouvrir la session</button>
+        <button type="button" onclick="closeLoginModal(); openForgotPasswordModal();" style="width:100%; background:none; border:none; color:var(--text-muted); text-decoration:underline; font-size:0.85rem; margin-top:0.8rem; cursor:pointer;">Mot de passe oublié ?</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: MOT DE PASSE OUBLIÉ (étape 1 : demander le lien par email) -->
+  <div class="modal-overlay" id="forgotPasswordModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="font-size:1.3rem; font-weight:800;">Mot de passe oublié</h3>
+        <button onclick="closeForgotPasswordModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Entrez votre adresse email. Si un compte existe avec cette adresse, un lien de réinitialisation sécurisé vous sera envoyé.</p>
+      <form onsubmit="handleForgotPasswordSubmit(event)">
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label>Email</label>
+          <input type="email" id="forgotPasswordEmail" class="form-input" placeholder="votre@email.com" required />
+        </div>
+        <button type="submit" id="forgotPasswordSubmitBtn" class="btn btn-primary" style="width:100%; justify-content:center;">Envoyer le lien</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DÉFINIR UN NOUVEAU MOT DE PASSE (étape 2 : après clic sur le lien reçu par email) -->
+  <div class="modal-overlay" id="resetPasswordModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="font-size:1.3rem; font-weight:800;">Nouveau mot de passe</h3>
+      </div>
+      <form onsubmit="handleSetNewPassword(event)">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Nouveau mot de passe</label>
+          <input type="password" id="resetPasswordNew" class="form-input" placeholder="6 caractères minimum" minlength="6" required />
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label>Confirmer le mot de passe</label>
+          <input type="password" id="resetPasswordConfirm" class="form-input" placeholder="6 caractères minimum" minlength="6" required />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Enregistrer le nouveau mot de passe</button>
       </form>
     </div>
   </div>
@@ -1087,6 +1184,21 @@
         <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.8rem;">Images publiées dans les discussions par votre compte.</p>
         
         <div class="insta-grid" id="profileInstaGrid"></div>
+      </div>
+
+      <div style="margin-top:1.5rem; border-top:1px solid var(--card-border); padding-top:1.2rem;">
+        <h4 style="font-size:0.95rem; font-weight:700; margin-bottom:0.6rem; display:flex; align-items:center; gap:0.4rem;">
+          <i data-lucide="lock" style="width:16px;"></i> Changer mon mot de passe
+        </h4>
+        <form onsubmit="handleChangePasswordFromProfile(event)">
+          <div class="form-group" style="margin-bottom:0.8rem;">
+            <input type="password" id="profileNewPassword" class="form-input" placeholder="Nouveau mot de passe (6 caractères min.)" minlength="6" required />
+          </div>
+          <div class="form-group" style="margin-bottom:0.8rem;">
+            <input type="password" id="profileNewPasswordConfirm" class="form-input" placeholder="Confirmer le nouveau mot de passe" minlength="6" required />
+          </div>
+          <button type="submit" class="btn btn-secondary" style="width:100%; justify-content:center;">Mettre à jour le mot de passe</button>
+        </form>
       </div>
     </div>
   </div>
@@ -1479,12 +1591,26 @@
 
       try {
         // 1) Créer le compte dans Supabase Auth (le trigger "on_auth_user_created" crée automatiquement la ligne dans "profiles")
+        // emailRedirectTo pointe vers cette page : Supabase envoie un vrai email de
+        // confirmation à l'adresse saisie. Si l'adresse n'existe pas réellement,
+        // cet email n'arrive jamais nulle part et le lien de confirmation n'est
+        // donc jamais cliqué : c'est le seul moyen fiable et non abusif de vérifier
+        // qu'une adresse email existe vraiment (il n'existe pas d'API, Gmail ou
+        // autre, permettant de "sonder" l'existence d'une boîte mail arbitraire).
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
           email, password,
-          options: { data: { display_name: name, role: role } }
+          options: {
+            data: { display_name: name, role: role },
+            emailRedirectTo: window.location.origin + window.location.pathname
+          }
         });
         if (signUpError) throw signUpError;
         const userId = signUpData.user ? signUpData.user.id : (signUpData.session ? signUpData.session.user.id : null);
+
+        // Si la confirmation d'email est activée côté Supabase (Dashboard > Authentication
+        // > Providers > Email > "Confirm email"), signUpData.session est null tant que le
+        // lien reçu par email n'a pas été cliqué : on ne peut donc pas encore ouvrir
+        // l'espace membre. C'est exactement le comportement "l'adresse doit exister pour de vrai".
 
         // 2) Relier le club principal + les clubs multiples (table profile_clubs) et enregistrer la fiche d'inscription
         if (userId) {
@@ -1525,8 +1651,15 @@
         sharedData.registeredUsers.push(currentUser);
         saveSharedState();
 
-        showToast("Compte créé avec succès !");
-        launchWorkspace();
+        if (signUpData.session) {
+          // Confirmation d'email désactivée sur ce projet Supabase : accès immédiat.
+          showToast("Compte créé avec succès !");
+          launchWorkspace();
+        } else {
+          // Confirmation d'email activée : impossible d'accéder à l'espace membre
+          // tant que le lien reçu par email n'a pas été cliqué.
+          alert("Compte créé ! Un email de confirmation a été envoyé à " + email + ". Cliquez sur le lien qu'il contient pour activer votre compte et accéder à votre espace membre.");
+        }
       } catch (err) {
         console.error(err);
         if (isRateLimitError(err)) {
@@ -1585,6 +1718,94 @@
 
     function openLoginModal() { document.getElementById('loginModal').classList.add('open'); }
     function closeLoginModal() { document.getElementById('loginModal').classList.remove('open'); }
+
+    /* ===================== MOT DE PASSE OUBLIÉ / RÉINITIALISATION ===================== */
+    // Détecte l'événement "PASSWORD_RECOVERY" envoyé par Supabase quand l'utilisateur
+    // clique sur le lien reçu par email, et ouvre automatiquement le formulaire
+    // de nouveau mot de passe (aucune donnée sensible n'est stockée côté client).
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        document.getElementById('resetPasswordModal').classList.add('open');
+      }
+    });
+
+    function openForgotPasswordModal() { document.getElementById('forgotPasswordModal').classList.add('open'); }
+    function closeForgotPasswordModal() { document.getElementById('forgotPasswordModal').classList.remove('open'); }
+
+    async function handleForgotPasswordSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('forgotPasswordEmail').value;
+      const btn = document.getElementById('forgotPasswordSubmitBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Envoi...'; }
+
+      try {
+        // Supabase envoie un vrai email avec un lien signé et à durée limitée.
+        // Si l'adresse n'existe pas réellement, aucun email n'arrive et le lien
+        // n'est donc jamais généré : le compte "n'existe pas pour de vrai" ne
+        // permet jamais de réinitialiser quoi que ce soit.
+        await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname
+        });
+      } catch (err) {
+        console.error(err);
+        // On ne remonte jamais l'erreur détaillée ici : révéler si un email existe
+        // ou non côté serveur permettrait l'énumération des comptes (faille de sécurité).
+      } finally {
+        // Message volontairement identique que l'email existe ou non.
+        closeForgotPasswordModal();
+        alert("Si un compte existe avec cette adresse email, un lien de réinitialisation vient d'être envoyé. Vérifiez votre boîte de réception (et vos spams).");
+        if (btn) { btn.disabled = false; btn.textContent = 'Envoyer le lien'; }
+        document.getElementById('forgotPasswordEmail').value = '';
+      }
+    }
+
+    async function handleSetNewPassword(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('resetPasswordNew').value;
+      const confirmPass = document.getElementById('resetPasswordConfirm').value;
+      if (newPass !== confirmPass) {
+        alert("Les deux mots de passe ne correspondent pas.");
+        return;
+      }
+      try {
+        // Cet appel est sécurisé par la session de récupération temporaire créée
+        // par Supabase à partir du lien cliqué — aucun mot de passe en clair
+        // n'est jamais stocké ni transmis ailleurs que vers l'API Supabase Auth.
+        const { error } = await supabaseClient.auth.updateUser({ password: newPass });
+        if (error) throw error;
+        document.getElementById('resetPasswordModal').classList.remove('open');
+        showToast("Mot de passe mis à jour avec succès !");
+        document.getElementById('resetPasswordNew').value = '';
+        document.getElementById('resetPasswordConfirm').value = '';
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la mise à jour du mot de passe : " + (err.message || err));
+      }
+    }
+
+    // Permet à un membre déjà connecté de changer son mot de passe à tout moment
+    // depuis son profil, sans passer par un email (la session active suffit à
+    // prouver son identité auprès de Supabase Auth).
+    async function handleChangePasswordFromProfile(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('profileNewPassword').value;
+      const confirmPass = document.getElementById('profileNewPasswordConfirm').value;
+      if (newPass !== confirmPass) {
+        alert("Les deux mots de passe ne correspondent pas.");
+        return;
+      }
+      try {
+        const { error } = await supabaseClient.auth.updateUser({ password: newPass });
+        if (error) throw error;
+        showToast("Mot de passe mis à jour avec succès !");
+        document.getElementById('profileNewPassword').value = '';
+        document.getElementById('profileNewPasswordConfirm').value = '';
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la mise à jour du mot de passe : " + (err.message || err));
+      }
+    }
+
     function scrollToInscription() { document.getElementById('inscription').scrollIntoView({ behavior: 'smooth' }); }
     function quickRegister(club) {
       const checkboxes = document.querySelectorAll('input[name="regClubs"]');
