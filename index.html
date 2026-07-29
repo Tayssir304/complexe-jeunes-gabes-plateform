@@ -259,7 +259,7 @@
     .chat-input-field { flex: 1; background: rgba(255,255,255,0.07); border: none; padding: 0.8rem 1rem; border-radius: 10px; color: white; outline: none; }
 
     /* Trello Board */
-    .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; }
+    .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; min-height: 300px; }
     .trello-club-tabs { display: flex; gap: 0.5rem; padding: 1rem 1.5rem 0; flex-wrap: wrap; }
     .trello-club-tab { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .trello-club-tab.active { background: var(--accent-gradient); color: white; border-color: transparent; }
@@ -2647,6 +2647,10 @@
     async function switchTrelloBoard(boardId) {
       trelloActiveBoardId = boardId;
       renderTrelloClubTabs();
+      
+      // Vérifier et créer les listes par défaut si elles n'existent pas
+      await ensureDefaultLists(boardId);
+      
       try {
         await loadAssigneesForClub(boardId);
       } catch (err) {
@@ -2655,9 +2659,63 @@
       await loadTrelloBoardData();
     }
 
+    async function ensureDefaultLists(boardId) {
+      try {
+        // Vérifier si des listes existent déjà pour ce board
+        const { data: existingLists, error: checkError } = await supabaseClient
+          .from('lists')
+          .select('id')
+          .eq('board_id', boardId)
+          .limit(1);
+        
+        if (checkError) {
+          console.error('Erreur lors de la vérification des listes:', checkError);
+          return;
+        }
+        
+        // Si des listes existent déjà, ne pas les recréer
+        if (existingLists && existingLists.length > 0) {
+          return;
+        }
+        
+        // Créer les 3 colonnes par défaut
+        const defaultLists = [
+          { name: 'À faire', position: 0 },
+          { name: 'En cours', position: 1 },
+          { name: 'Terminé', position: 2 }
+        ];
+        
+        for (const listData of defaultLists) {
+          const { error: insertError } = await supabaseClient
+            .from('lists')
+            .insert({
+              board_id: boardId,
+              name: listData.name,
+              position: listData.position
+            });
+          
+          if (insertError) {
+            console.error(`Erreur lors de la création de la liste "${listData.name}":`, insertError);
+          }
+        }
+        
+        showToast('Colonnes par défaut créées pour ce club !');
+      } catch (err) {
+        console.error('ensureDefaultLists error:', err);
+      }
+    }
+
     async function loadTrelloBoardData() {
       const container = document.getElementById('trelloBoardContainer');
-      if (!trelloActiveBoardId) { if (container) container.innerHTML = ''; return; }
+      if (!trelloActiveBoardId) { 
+        if (container) container.innerHTML = ''; 
+        return; 
+      }
+
+      // Afficher un message de chargement
+      if (container) {
+        container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Chargement des colonnes...</p>`;
+      }
 
       try {
         const { data: lists, error: listsErr } = await withTimeout(
@@ -2667,7 +2725,23 @@
           if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Erreur de chargement : ${escapeHtml(listsErr.message)}</p>`;
           return;
         }
+        
         trelloListsCache = lists || [];
+        
+        // Si aucune liste n'existe, tenter d'en créer
+        if (trelloListsCache.length === 0) {
+          await ensureDefaultLists(trelloActiveBoardId);
+          // Recharger les listes après création
+          const { data: refreshedLists, error: refreshErr } = await supabaseClient
+            .from('lists')
+            .select('id, name, position')
+            .eq('board_id', trelloActiveBoardId)
+            .order('position');
+          if (!refreshErr && refreshedLists) {
+            trelloListsCache = refreshedLists;
+          }
+        }
+        
         const listIds = trelloListsCache.map(l => l.id);
 
         let cards = [];
@@ -2702,7 +2776,15 @@
       const listsToShow = trelloListsCache.length > 0 ? trelloListsCache : [];
 
       if (listsToShow.length === 0) {
-        container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucune colonne configurée pour ce club.</p>`;
+        container.innerHTML = `
+          <div style="width:100%; text-align:center; padding:2rem;">
+            <p style="color:var(--text-muted); margin-bottom:1rem;">Aucune colonne configurée pour ce club.</p>
+            <button class="btn btn-primary" onclick="ensureDefaultLists('${trelloActiveBoardId}'); loadTrelloBoardData();">
+              <i data-lucide="plus" style="width:16px;"></i> Créer les colonnes par défaut
+            </button>
+          </div>
+        `;
+        lucide.createIcons();
         return;
       }
 
@@ -2826,8 +2908,15 @@
         if (lists && lists.length > 0) {
           targetListId = lists[0].id;
         } else {
-          showToast("Ce club n'a pas encore de colonnes configurées.");
-          return;
+          // Créer les listes par défaut
+          await ensureDefaultLists(clubId);
+          const { data: newLists } = await supabaseClient.from('lists').select('id').eq('board_id', clubId).order('position').limit(1);
+          if (newLists && newLists.length > 0) {
+            targetListId = newLists[0].id;
+          } else {
+            showToast("Ce club n'a pas encore de colonnes configurées.");
+            return;
+          }
         }
       }
 
