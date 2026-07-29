@@ -374,7 +374,6 @@
     .sidebar-backdrop { display: none; }
 
     @media (max-width: 860px) {
-      /* --- Navbar & hero --- */
       .navbar { flex-wrap: wrap; gap: 0.8rem; padding: 1rem; }
       .nav-links { order: 3; width: 100%; justify-content: center; gap: 1.2rem; }
       .nav-actions { gap: 0.5rem; }
@@ -383,16 +382,12 @@
       .hero > div[style*="display:flex"] { flex-direction: column; width: 100%; max-width: 320px; }
       .hero > div[style*="display:flex"] .btn { width: 100%; justify-content: center; }
       .section-container { padding: 0 1.2rem; margin: 2.5rem auto; }
-
-      /* --- Forms & modals --- */
       .form-grid { grid-template-columns: 1fr; }
       .inscription-container { padding: 1.5rem 1.2rem; }
       .modal-card { padding: 1.5rem 1.2rem; max-width: 100%; width: calc(100% - 2rem); max-height: 90vh; overflow-y: auto; }
       .profile-header-area { flex-direction: column; text-align: center; }
       .profile-header-area > div[style*="flex:1"] { width: 100%; }
       .profile-header-area > div[style*="display:flex"][style*="align-items:center"] { justify-content: center; }
-
-      /* --- Workspace: turn the fixed sidebar into a slide-in drawer --- */
       .workspace-layout { grid-template-columns: 1fr !important; }
       .sidebar-toggle-btn { display: inline-flex; }
       .discord-sidebar {
@@ -625,10 +620,6 @@
                 <option value="Président">Président / Chef de projet</option>
                 <option value="Designer">Designer UI/UX</option>
               </select>
-            </div>
-            <div class="form-group">
-              <label>Mot de passe</label>
-              <input type="password" id="regPass" class="form-input" placeholder="••••••••" required />
             </div>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1.5rem; justify-content:center;">Accéder à mon Espace Membre</button>
@@ -1218,6 +1209,42 @@
     </div>
   </div>
 
+  <!-- MODAL: NOUVELLE CARTE TRELLO -->
+  <div class="modal-overlay" id="newCardModal">
+    <div class="modal-card" style="max-width:500px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="font-size:1.3rem; font-weight:800;">Nouvelle tâche</h3>
+        <button onclick="closeNewCardModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <form onsubmit="handleCreateCardSubmit(event)">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Club</label>
+          <select id="newCardClub" class="form-input" required onchange="loadAssigneesForClub(this.value)"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Titre de la tâche</label>
+          <input type="text" id="newCardTitle" class="form-input" placeholder="Ex: Préparer l'affiche de l'événement" required maxlength="120" />
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Description (optionnel)</label>
+          <textarea id="newCardDescription" class="form-input" rows="3" placeholder="Détails de la tâche..." maxlength="500"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label>Assigné à</label>
+          <select id="newCardAssignee" class="form-input">
+            <option value="">Non assigné</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label>Date limite (optionnel)</label>
+          <input type="date" id="newCardDueDate" class="form-input" />
+        </div>
+        <input type="hidden" id="newCardListId" />
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Créer la tâche</button>
+      </form>
+    </div>
+  </div>
+
   <!-- SCRIPT LOGIQUE ET INTERACTIVITÉ DE L'APPLICATION -->
   <script>
     // Échappe le HTML pour empêcher toute injection de script (XSS) via des
@@ -1367,9 +1394,9 @@
 
     /* ===================== NOTIFICATIONS (Messenger-style) ===================== */
     let notifPermissionGranted = false;
-    let notifSnapshot = null;      // { channels: {name: count}, directChats: {email: count}, memberDirectChats: {key: count} }
-    let unreadCounts = {};         // { chatId: count } chatId = channel name | 'contact-admin' | 'dm:email'
-    let bellUnseen = 0;            // count shown on the bell badge, cleared as soon as the bell is opened (Messenger-style)
+    let notifSnapshot = null;
+    let unreadCounts = {};
+    let bellUnseen = 0;
     let notifPollHandle = null;
 
     function initNotifications() {
@@ -1409,7 +1436,6 @@
     }
 
     function handleNotifBellClick() {
-      // Seeing/opening the bell marks pending notifications as seen, like Messenger.
       markBellSeen();
 
       if (!('Notification' in window)) { showToast("Notifications non supportées par ce navigateur."); return; }
@@ -1463,7 +1489,7 @@
       updateNotifBellUI();
       renderChannels();
 
-      if (isOpenAndVisible) return; // already looking at it, no need to interrupt
+      if (isOpenAndVisible) return;
 
       playNotifSound();
       const preview = msg.text ? msg.text.slice(0, 90) : (msg.image ? 'Photo envoyée' : 'Nouveau message');
@@ -1481,7 +1507,6 @@
       if (!currentUser || !currentUser.email) return;
       const newSnap = buildNotifSnapshot();
 
-      // Channels
       Object.keys(newSnap.channels).forEach(ch => {
         const oldCount = (notifSnapshot.channels && notifSnapshot.channels[ch]) || 0;
         const newCount = newSnap.channels[ch];
@@ -1493,7 +1518,6 @@
         }
       });
 
-      // Direct chat with admin (only relevant if it's mine)
       const myEmail = currentUser.email;
       const oldAdminCount = (notifSnapshot.directChats && notifSnapshot.directChats[myEmail]) || 0;
       const newAdminCount = newSnap.directChats[myEmail] || 0;
@@ -1504,7 +1528,6 @@
         });
       }
 
-      // Member-to-member DMs involving me
       Object.keys(newSnap.memberDirectChats).forEach(key => {
         const [a, b] = key.split('|');
         if (a !== myEmail && b !== myEmail) return;
@@ -1570,14 +1593,11 @@
       const password = document.getElementById('regPassword').value;
       const role = document.getElementById('regRole').value;
       const submitBtn = e.target.querySelector('button[type="submit"], .btn-primary');
-      // Empêche le double-clic / la resoumission rapide (UX ; la vraie limite est côté Supabase Auth)
       if (submitBtn && submitBtn.disabled) return;
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        // 0) Vérifier que l'adresse email est réellement déliverable (MX + SMTP réel,
-        // pas juste un format valide) via une fonction serverless Vercel qui garde
-        // la clé API secrète côté serveur (jamais exposée dans le navigateur).
+        // Vérification de l'email via Abstract API (Vercel Serverless Function)
         if (submitBtn) submitBtn.textContent = 'Vérification de l\'email...';
         let emailCheck = { valid: true };
         try {
@@ -1589,8 +1609,6 @@
           emailCheck = await verifyRes.json();
         } catch (verifyErr) {
           console.error('Email verification request failed:', verifyErr);
-          // Si l'appel échoue (ex: fonction pas encore déployée), on n'empêche pas
-          // l'inscription — la confirmation par email reste un filet de sécurité.
         }
 
         if (emailCheck.valid === false) {
@@ -1604,13 +1622,6 @@
           return;
         }
 
-        // 1) Créer le compte dans Supabase Auth (le trigger "on_auth_user_created" crée automatiquement la ligne dans "profiles")
-        // emailRedirectTo pointe vers cette page : Supabase envoie un vrai email de
-        // confirmation à l'adresse saisie. Si l'adresse n'existe pas réellement,
-        // cet email n'arrive jamais nulle part et le lien de confirmation n'est
-        // donc jamais cliqué : c'est le seul moyen fiable et non abusif de vérifier
-        // qu'une adresse email existe vraiment (il n'existe pas d'API, Gmail ou
-        // autre, permettant de "sonder" l'existence d'une boîte mail arbitraire).
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
           email, password,
           options: {
@@ -1621,12 +1632,6 @@
         if (signUpError) throw signUpError;
         const userId = signUpData.user ? signUpData.user.id : (signUpData.session ? signUpData.session.user.id : null);
 
-        // Si la confirmation d'email est activée côté Supabase (Dashboard > Authentication
-        // > Providers > Email > "Confirm email"), signUpData.session est null tant que le
-        // lien reçu par email n'a pas été cliqué : on ne peut donc pas encore ouvrir
-        // l'espace membre. C'est exactement le comportement "l'adresse doit exister pour de vrai".
-
-        // 2) Relier le club principal + les clubs multiples (table profile_clubs) et enregistrer la fiche d'inscription
         if (userId) {
           const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
           const boardIdByName = {};
@@ -1660,18 +1665,14 @@
           status: "non paye", avatar: null
         };
 
-        // On garde aussi une copie locale pour l'affichage du panneau membres existant
         sharedData.registeredUsers = sharedData.registeredUsers.filter(u => u.email !== currentUser.email);
         sharedData.registeredUsers.push(currentUser);
         saveSharedState();
 
         if (signUpData.session) {
-          // Confirmation d'email désactivée sur ce projet Supabase : accès immédiat.
           showToast("Compte créé avec succès !");
           launchWorkspace();
         } else {
-          // Confirmation d'email activée : impossible d'accéder à l'espace membre
-          // tant que le lien reçu par email n'a pas été cliqué.
           alert("Compte créé ! Un email de confirmation a été envoyé à " + email + ". Cliquez sur le lien qu'il contient pour activer votre compte et accéder à votre espace membre.");
         }
       } catch (err) {
@@ -1706,10 +1707,7 @@
         let { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
         const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
 
-        // Auto-réparation : si le lien club_id / profile_clubs n'a pas été fait au moment de
-        // l'inscription (ex: confirmation d'email activée => pas de session active à ce moment-là,
-        // donc les policies RLS bloquaient l'écriture), on le refait ici, maintenant que
-        // l'utilisateur est bien authentifié (auth.uid() est disponible pour les policies RLS).
+        // Auto-réparation du club_id si manquant
         if (profile && !profile.club_id && regRow && regRow.clubs && regRow.clubs.length > 0) {
           try {
             const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
@@ -1762,9 +1760,6 @@
     function closeLoginModal() { document.getElementById('loginModal').classList.remove('open'); }
 
     /* ===================== MOT DE PASSE OUBLIÉ / RÉINITIALISATION ===================== */
-    // Détecte l'événement "PASSWORD_RECOVERY" envoyé par Supabase quand l'utilisateur
-    // clique sur le lien reçu par email, et ouvre automatiquement le formulaire
-    // de nouveau mot de passe (aucune donnée sensible n'est stockée côté client).
     supabaseClient.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         document.getElementById('resetPasswordModal').classList.add('open');
@@ -1781,19 +1776,12 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Envoi...'; }
 
       try {
-        // Supabase envoie un vrai email avec un lien signé et à durée limitée.
-        // Si l'adresse n'existe pas réellement, aucun email n'arrive et le lien
-        // n'est donc jamais généré : le compte "n'existe pas pour de vrai" ne
-        // permet jamais de réinitialiser quoi que ce soit.
         await supabaseClient.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + window.location.pathname
         });
       } catch (err) {
         console.error(err);
-        // On ne remonte jamais l'erreur détaillée ici : révéler si un email existe
-        // ou non côté serveur permettrait l'énumération des comptes (faille de sécurité).
       } finally {
-        // Message volontairement identique que l'email existe ou non.
         closeForgotPasswordModal();
         alert("Si un compte existe avec cette adresse email, un lien de réinitialisation vient d'être envoyé. Vérifiez votre boîte de réception (et vos spams).");
         if (btn) { btn.disabled = false; btn.textContent = 'Envoyer le lien'; }
@@ -1810,9 +1798,6 @@
         return;
       }
       try {
-        // Cet appel est sécurisé par la session de récupération temporaire créée
-        // par Supabase à partir du lien cliqué — aucun mot de passe en clair
-        // n'est jamais stocké ni transmis ailleurs que vers l'API Supabase Auth.
         const { error } = await supabaseClient.auth.updateUser({ password: newPass });
         if (error) throw error;
         document.getElementById('resetPasswordModal').classList.remove('open');
@@ -1825,9 +1810,6 @@
       }
     }
 
-    // Permet à un membre déjà connecté de changer son mot de passe à tout moment
-    // depuis son profil, sans passer par un email (la session active suffit à
-    // prouver son identité auprès de Supabase Auth).
     async function handleChangePasswordFromProfile(e) {
       e.preventDefault();
       const newPass = document.getElementById('profileNewPassword').value;
@@ -1907,8 +1889,6 @@
 
       renderProfilePaymentStatus();
 
-      // Va rechercher le statut le plus récent en base (au cas où un admin l'aurait
-      // changé depuis la dernière connexion) pour ne jamais afficher une valeur périmée.
       if (currentUser.id) {
         const { data: regRow } = await supabaseClient
           .from('registrations').select('status')
@@ -1957,9 +1937,6 @@
       statusEl.className = (statusVal === "paye" || statusVal === "payé") ? "status-badge paid" : "status-badge";
     }
 
-    // Écoute en temps réel les changements de statut de paiement (table "registrations")
-    // pour ce membre : si un admin marque "payé" pendant que le membre est déjà sur la
-    // page, le badge se met à jour immédiatement, sans avoir besoin de se reconnecter.
     let paymentStatusChannel = null;
     function subscribeToPaymentStatus(userId) {
       if (!userId) return;
@@ -2203,7 +2180,6 @@
       directItem.onclick = () => switchChannel('contact-admin', directItem);
       dmContainer.appendChild(directItem);
 
-      // Conversations privées actives avec d'autres membres
       const myEmail = currentUser.email;
       const activeDMs = Object.keys(sharedData.memberDirectChats || {}).filter(key => {
         const [a, b] = key.split('|');
@@ -2616,15 +2592,12 @@
     }
 
     /* ===================== TABLEAU TRELLO PAR CLUB (Supabase: boards / lists / cards) ===================== */
-    let trelloBoardsCache = [];     // [{id, name}] clubs accessibles à l'utilisateur
+    let trelloBoardsCache = [];
     let trelloActiveBoardId = null;
-    let trelloListsCache = [];      // lists de trelloActiveBoardId
-    let trelloCardsCache = [];      // cards de ces lists, avec profils jointes
-    let trelloMembersCache = [];    // membres du club actif, pour le select "Assigné à"
+    let trelloListsCache = [];
+    let trelloCardsCache = [];
+    let trelloMembersCache = [];
 
-    // Empêche un appel Supabase de rester bloqué indéfiniment (ex: projet Supabase en pause).
-    // Sans ce garde-fou, un await qui ne se résout jamais laisse le message
-    // "Chargement du tableau..." affiché pour toujours, sans aucune erreur visible.
     function withTimeout(promise, ms = 10000) {
       return Promise.race([
         promise,
@@ -2637,7 +2610,6 @@
       if (container) container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Chargement du tableau...</p>`;
 
       try {
-        // Un membre voit les clubs auxquels il appartient ; l'admin (accès direct à ce workspace) voit tout.
         const myClubNames = (currentUser.clubs || [currentUser.club]).filter(Boolean).map(c => CLUB_NAME_TO_BOARD[c] || c);
 
         const { data: boards, error } = await withTimeout(
@@ -2649,17 +2621,15 @@
         }
 
         trelloBoardsCache = (boards || []).filter(b => myClubNames.includes(b.name));
-        if (trelloBoardsCache.length === 0) trelloBoardsCache = boards || []; // secours si aucune correspondance trouvée
+        if (trelloBoardsCache.length === 0) trelloBoardsCache = boards || [];
 
         renderTrelloClubTabs();
         if (trelloBoardsCache.length > 0) {
           await switchTrelloBoard(trelloBoardsCache[0].id);
         } else if (container) {
-          container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte. Si vous venez de vous inscrire, essayez de vous déconnecter puis reconnecter. Sinon, contactez un administrateur.</p>`;
+          container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte.</p>`;
         }
       } catch (err) {
-        // C'était la cause du blocage infini : une erreur ici n'était jamais rattrapée,
-        // donc le tableau restait sur "Chargement du tableau..." sans jamais rien afficher.
         console.error('initTrelloTab error:', err);
         if (container) {
           container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">
@@ -2681,10 +2651,6 @@
     async function switchTrelloBoard(boardId) {
       trelloActiveBoardId = boardId;
       renderTrelloClubTabs();
-      // loadAssigneesForClub alimente le select "Assigné à" du modal ; ce n'est pas critique
-      // pour l'affichage du tableau, donc une erreur ici ne doit jamais empêcher
-      // loadTrelloBoardData() de s'exécuter (c'était le bug : un rejet non rattrapé ici
-      // bloquait tout le reste et laissait "Chargement du tableau..." indéfiniment).
       try {
         await loadAssigneesForClub(boardId);
       } catch (err) {
@@ -2786,8 +2752,6 @@
       `;
     }
 
-    // Charge les membres du club sélectionné pour peupler le select "Assigné à"
-    // (membres dont le club principal correspond, ou inscrits via profile_clubs pour les multi-clubs)
     async function loadAssigneesForClub(boardId) {
       if (!boardId) return;
       const select = document.getElementById('newCardAssignee');
@@ -2839,8 +2803,6 @@
       const dueDate = document.getElementById('newCardDueDate').value || null;
       if (!title) return;
 
-      // La carte est toujours créée dans la première colonne (À faire) du club choisi,
-      // même si le "+" a été cliqué depuis une autre colonne.
       const { data: lists } = await supabaseClient.from('lists').select('id, position').eq('board_id', clubId).order('position');
       const targetList = (lists && lists[0]) || null;
       if (!targetList) { alert("Ce club n'a pas encore de colonnes configurées."); return; }
@@ -2904,7 +2866,6 @@
       document.getElementById('lockOverlay').style.display = 'flex';
     }
 
-    // Vérifie que l'utilisateur connecté a le droit d'admin (RLS côté Supabase, pas un flag client)
     async function checkIsAdmin() {
       const { error } = await supabaseClient
         .from('registrations')
@@ -3015,7 +2976,6 @@
       document.getElementById('statChannels').innerText = sharedData.channels.length;
       document.getElementById('statMedia').innerText = totalMedia;
 
-      // Menu déroulant pour le choix du salon des annonces
       const annSelect = document.getElementById('announcementChannelSelect');
       if (annSelect) {
         annSelect.innerHTML = '';
@@ -3027,7 +2987,6 @@
         });
       }
 
-      // Menu déroulant pour le chat direct privé
       const directSelect = document.getElementById('directUserSelect');
       if (directSelect) {
         const selectedPrev = directSelect.value;
@@ -3282,7 +3241,6 @@
         .order('created_at', { ascending: false });
 
       if (error) {
-        // Si l'utilisateur courant n'est pas admin, la policy RLS bloque la lecture de tous les enregistrements.
         tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted);">Accès administrateur requis pour voir la liste complète des membres.</td></tr>`;
         return;
       }
@@ -3330,41 +3288,17 @@
       showToast("Statut de paiement mis à jour !");
       renderUsersTable();
     }
-  </script>  <!-- MODAL: NOUVELLE CARTE TRELLO -->
-  <div class="modal-overlay" id="newCardModal">
-    <div class="modal-card" style="max-width:500px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-        <h3 style="font-size:1.3rem; font-weight:800;">Nouvelle tâche</h3>
-        <button onclick="closeNewCardModal()" style="background:none; border:none; color:white; cursor:pointer;"><i data-lucide="x"></i></button>
-      </div>
-      <form onsubmit="handleCreateCardSubmit(event)">
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label>Club</label>
-          <select id="newCardClub" class="form-input" required onchange="loadAssigneesForClub(this.value)"></select>
-        </div>
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label>Titre de la tâche</label>
-          <input type="text" id="newCardTitle" class="form-input" placeholder="Ex: Préparer l'affiche de l'événement" required maxlength="120" />
-        </div>
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label>Description (optionnel)</label>
-          <textarea id="newCardDescription" class="form-input" rows="3" placeholder="Détails de la tâche..." maxlength="500"></textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label>Assigné à</label>
-          <select id="newCardAssignee" class="form-input">
-            <option value="">Non assigné</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:1.5rem;">
-          <label>Date limite (optionnel)</label>
-          <input type="date" id="newCardDueDate" class="form-input" />
-        </div>
-        <input type="hidden" id="newCardListId" />
-        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Créer la tâche</button>
-      </form>
-    </div>
-  </div>
 
+    // Mobile sidebar functions
+    function openMobileSidebar() {
+      document.querySelector('.discord-sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarBackdrop').classList.add('active');
+    }
+
+    function closeMobileSidebar() {
+      document.querySelector('.discord-sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarBackdrop').classList.remove('active');
+    }
+  </script>
 </body>
 </html>
