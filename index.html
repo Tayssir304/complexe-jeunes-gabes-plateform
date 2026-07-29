@@ -1354,8 +1354,42 @@
       if (!session) return false;
 
       const userId = session.user.id;
-      const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+      let { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
       const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+
+      // Auto-réparation : si l'utilisateur est inscrit à des clubs (table registrations)
+      // mais que le lien profile_clubs n'a pas été créé (ex: échec silencieux lors de
+      // l'inscription car la session n'était pas encore active), on le recrée ici.
+      if (regRow && regRow.clubs && regRow.clubs.length > 0) {
+        try {
+          const { data: existingLinks } = await supabaseClient
+            .from('profile_clubs').select('club_id').eq('profile_id', userId);
+
+          if (!existingLinks || existingLinks.length === 0) {
+            const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
+            const boardIdByName = {};
+            (boardsRows || []).forEach(b => boardIdByName[b.name] = b.id);
+
+            if (profile && !profile.club_id) {
+              const primaryBoardId = boardIdByName[CLUB_NAME_TO_BOARD[regRow.clubs[0]] || regRow.clubs[0]] || null;
+              if (primaryBoardId) {
+                await supabaseClient.from('profiles').update({ club_id: primaryBoardId }).eq('id', userId);
+                profile.club_id = primaryBoardId;
+              }
+            }
+
+            const clubRows = regRow.clubs
+              .map(c => boardIdByName[CLUB_NAME_TO_BOARD[c] || c])
+              .filter(Boolean)
+              .map(clubId => ({ profile_id: userId, club_id: clubId }));
+            if (clubRows.length) {
+              await supabaseClient.from('profile_clubs').insert(clubRows);
+            }
+          }
+        } catch (linkErr) {
+          console.error('Auto-réparation du profile_clubs (restore session) échouée :', linkErr);
+        }
+      }
 
       currentUser = {
         id: userId,
@@ -1707,25 +1741,34 @@
         let { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
         const { data: regRow } = await supabaseClient.from('registrations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
 
-        // Auto-réparation du club_id si manquant
-        if (profile && !profile.club_id && regRow && regRow.clubs && regRow.clubs.length > 0) {
+        // Auto-réparation : recrée le lien profile_clubs (et club_id) si manquant.
+        // On vérifie profile_clubs directement (et pas seulement club_id) car les deux
+        // peuvent être désynchronisés si l'inscription a échoué partiellement.
+        if (regRow && regRow.clubs && regRow.clubs.length > 0) {
           try {
-            const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
-            const boardIdByName = {};
-            (boardsRows || []).forEach(b => boardIdByName[b.name] = b.id);
-            const primaryBoardId = boardIdByName[CLUB_NAME_TO_BOARD[regRow.clubs[0]] || regRow.clubs[0]] || null;
+            const { data: existingLinks } = await supabaseClient
+              .from('profile_clubs').select('club_id').eq('profile_id', userId);
 
-            if (primaryBoardId) {
-              await supabaseClient.from('profiles').update({ club_id: primaryBoardId }).eq('id', userId);
-              profile.club_id = primaryBoardId;
-            }
+            if (!existingLinks || existingLinks.length === 0) {
+              const { data: boardsRows } = await supabaseClient.from('boards').select('id, name');
+              const boardIdByName = {};
+              (boardsRows || []).forEach(b => boardIdByName[b.name] = b.id);
 
-            const clubRows = regRow.clubs
-              .map(c => boardIdByName[CLUB_NAME_TO_BOARD[c] || c])
-              .filter(Boolean)
-              .map(clubId => ({ profile_id: userId, club_id: clubId }));
-            if (clubRows.length) {
-              await supabaseClient.from('profile_clubs').insert(clubRows);
+              if (profile && !profile.club_id) {
+                const primaryBoardId = boardIdByName[CLUB_NAME_TO_BOARD[regRow.clubs[0]] || regRow.clubs[0]] || null;
+                if (primaryBoardId) {
+                  await supabaseClient.from('profiles').update({ club_id: primaryBoardId }).eq('id', userId);
+                  profile.club_id = primaryBoardId;
+                }
+              }
+
+              const clubRows = regRow.clubs
+                .map(c => boardIdByName[CLUB_NAME_TO_BOARD[c] || c])
+                .filter(Boolean)
+                .map(clubId => ({ profile_id: userId, club_id: clubId }));
+              if (clubRows.length) {
+                await supabaseClient.from('profile_clubs').insert(clubRows);
+              }
             }
           } catch (linkErr) {
             console.error('Auto-réparation du club_id échouée :', linkErr);
