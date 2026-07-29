@@ -2374,12 +2374,16 @@
         document.getElementById('btnTabChat').classList.add('active');
         document.getElementById('tabChat').classList.add('active');
         workspaceLayout.classList.remove('no-sidebar');
-        switchChannel('general');
+        // Ne pas changer de channel ici
       } else if (tab === 'board') {
         document.getElementById('btnTabBoard').classList.add('active');
         document.getElementById('tabBoard').classList.add('active');
         workspaceLayout.classList.add('no-sidebar');
-        if (trelloActiveBoardId) { loadTrelloBoardData(); } else { initTrelloTab(); }
+        if (trelloActiveBoardId) { 
+          loadTrelloBoardData(); 
+        } else { 
+          initTrelloTab(); 
+        }
       } else if (tab === 'gallery') {
         document.getElementById('btnTabGallery').classList.add('active');
         document.getElementById('tabGallery').classList.add('active');
@@ -2427,7 +2431,7 @@
       
       tempGalleryImage = null;
       closeDescModal();
-      showToastMessage("Photo soumise ! En attente d'approbation de l'administrateur");
+      showToast("Photo soumise ! En attente d'approbation de l'administrateur");
       renderMemberGallery();
     }
 
@@ -2579,16 +2583,7 @@
       link.click();
       document.body.removeChild(link);
       
-      showToastMessage(' Photo téléchargée sur votre appareil!');
-    }
-
-    function showToastMessage(msg) {
-      const toast = document.getElementById('toastMsg');
-      if (toast) {
-        toast.innerText = msg;
-        toast.style.display = 'block';
-        setTimeout(() => { toast.style.display = 'none'; }, 2500);
-      }
+      showToast(' Photo téléchargée sur votre appareil!');
     }
 
     /* ===================== TABLEAU TRELLO PAR CLUB (Supabase: boards / lists / cards) ===================== */
@@ -2625,7 +2620,8 @@
 
         renderTrelloClubTabs();
         if (trelloBoardsCache.length > 0) {
-          await switchTrelloBoard(trelloBoardsCache[0].id);
+          trelloActiveBoardId = trelloBoardsCache[0].id;
+          await switchTrelloBoard(trelloActiveBoardId);
         } else if (container) {
           container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucun tableau accessible pour votre compte.</p>`;
         }
@@ -2702,7 +2698,15 @@
       const container = document.getElementById('trelloBoardContainer');
       if (!container) return;
 
-      container.innerHTML = trelloListsCache.map(list => {
+      // Filtrer les listes pour n'afficher que celles qui ont des cartes ou les 3 principales
+      const listsToShow = trelloListsCache.length > 0 ? trelloListsCache : [];
+
+      if (listsToShow.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-muted); padding:1.5rem;">Aucune colonne configurée pour ce club.</p>`;
+        return;
+      }
+
+      container.innerHTML = listsToShow.map(list => {
         const listCards = trelloCardsCache.filter(c => c.list_id === list.id);
         return `
           <div class="kanban-col">
@@ -2756,25 +2760,32 @@
       if (!boardId) return;
       const select = document.getElementById('newCardAssignee');
 
-      const [{ data: primaryMembers }, { data: extraLinks }] = await withTimeout(Promise.all([
-        supabaseClient.from('profiles').select('id, display_name').eq('club_id', boardId),
-        supabaseClient.from('profile_clubs').select('profile_id').eq('club_id', boardId)
-      ]));
+      try {
+        const [{ data: primaryMembers }, { data: extraLinks }] = await withTimeout(Promise.all([
+          supabaseClient.from('profiles').select('id, display_name').eq('club_id', boardId),
+          supabaseClient.from('profile_clubs').select('profile_id').eq('club_id', boardId)
+        ]));
 
-      let extraMembers = [];
-      const extraIds = (extraLinks || []).map(l => l.profile_id);
-      if (extraIds.length > 0) {
-        const { data } = await withTimeout(supabaseClient.from('profiles').select('id, display_name').in('id', extraIds));
-        extraMembers = data || [];
-      }
+        let extraMembers = [];
+        const extraIds = (extraLinks || []).map(l => l.profile_id);
+        if (extraIds.length > 0) {
+          const { data } = await withTimeout(supabaseClient.from('profiles').select('id, display_name').in('id', extraIds));
+          extraMembers = data || [];
+        }
 
-      const merged = [...(primaryMembers || []), ...extraMembers];
-      const seen = new Set();
-      trelloMembersCache = merged.filter(m => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+        const merged = [...(primaryMembers || []), ...extraMembers];
+        const seen = new Set();
+        trelloMembersCache = merged.filter(m => (seen.has(m.id) ? false : (seen.add(m.id), true)));
 
-      if (select) {
-        select.innerHTML = '<option value="">Non assigné</option>' +
-          trelloMembersCache.map(m => `<option value="${m.id}">${escapeHtml(m.display_name || 'Membre')}</option>`).join('');
+        if (select) {
+          select.innerHTML = '<option value="">Non assigné</option>' +
+            trelloMembersCache.map(m => `<option value="${m.id}">${escapeHtml(m.display_name || 'Membre')}</option>`).join('');
+        }
+      } catch (err) {
+        console.error('loadAssigneesForClub error:', err);
+        if (select) {
+          select.innerHTML = '<option value="">Non assigné</option>';
+        }
       }
     }
 
@@ -2801,47 +2812,59 @@
       const description = document.getElementById('newCardDescription').value.trim();
       const assigneeId = document.getElementById('newCardAssignee').value || null;
       const dueDate = document.getElementById('newCardDueDate').value || null;
-      if (!title) return;
+      const listId = document.getElementById('newCardListId').value;
+      
+      if (!title) {
+        showToast("Veuillez saisir un titre pour la tâche.");
+        return;
+      }
 
-      const { data: lists } = await supabaseClient.from('lists').select('id, position').eq('board_id', clubId).order('position');
-      const targetList = (lists && lists[0]) || null;
-      if (!targetList) { alert("Ce club n'a pas encore de colonnes configurées."); return; }
+      // Si pas de listId, on récupère la première liste du club
+      let targetListId = listId;
+      if (!targetListId) {
+        const { data: lists } = await supabaseClient.from('lists').select('id').eq('board_id', clubId).order('position').limit(1);
+        if (lists && lists.length > 0) {
+          targetListId = lists[0].id;
+        } else {
+          showToast("Ce club n'a pas encore de colonnes configurées.");
+          return;
+        }
+      }
 
       const assigneeName = assigneeId ? (trelloMembersCache.find(m => m.id === assigneeId)?.display_name || '') : '';
 
       const { error } = await supabaseClient.from('cards').insert({
-        list_id: targetList.id,
-        title, description,
+        list_id: targetListId,
+        title: title,
+        description: description || null,
         assignee_id: assigneeId,
         assignee: assigneeName,
-        due_date: dueDate,
+        due_date: dueDate || null,
         created_by: currentUser.id
       });
 
       if (error) {
-        alert("Erreur lors de la création de la tâche : " + error.message);
+        showToast("Erreur lors de la création de la tâche : " + error.message);
         return;
       }
 
       closeNewCardModal();
-      showToastMessage("Tâche créée !");
-      if (clubId === trelloActiveBoardId) {
-        await loadTrelloBoardData();
-      } else {
-        await switchTrelloBoard(clubId);
-      }
+      showToast("Tâche créée !");
+      await loadTrelloBoardData();
     }
 
     async function moveCardToList(cardId, newListId) {
       const { error } = await supabaseClient.from('cards').update({ list_id: newListId }).eq('id', cardId);
-      if (error) { alert("Erreur : " + error.message); return; }
+      if (error) { showToast("Erreur : " + error.message); return; }
+      showToast("Tâche déplacée !");
       await loadTrelloBoardData();
     }
 
     async function deleteTrelloCard(cardId) {
       if (!confirm("Supprimer cette carte ?")) return;
       const { error } = await supabaseClient.from('cards').delete().eq('id', cardId);
-      if (error) { alert("Erreur : " + error.message); return; }
+      if (error) { showToast("Erreur : " + error.message); return; }
+      showToast("Tâche supprimée !");
       await loadTrelloBoardData();
     }
 
@@ -2867,10 +2890,14 @@
     }
 
     async function checkIsAdmin() {
-      const { error } = await supabaseClient
-        .from('registrations')
-        .select('id', { count: 'exact', head: true });
-      return !error;
+      try {
+        const { error } = await supabaseClient
+          .from('registrations')
+          .select('id', { count: 'exact', head: true });
+        return !error;
+      } catch (e) {
+        return false;
+      }
     }
 
     function closeAdminPanel() {
