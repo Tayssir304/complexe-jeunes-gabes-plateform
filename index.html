@@ -260,9 +260,28 @@
 
     /* Trello Board */
     .kanban-board { flex: 1; padding: 1.5rem; display: flex; gap: 1.5rem; overflow-x: auto; align-items: flex-start; min-height: 300px; }
-    .trello-club-tabs { display: flex; gap: 0.5rem; padding: 1rem 1.5rem 0; flex-wrap: wrap; }
-    .trello-club-tab { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .trello-club-tab.active { background: var(--accent-gradient); color: white; border-color: transparent; }
+    .trello-club-dropdown-wrap { position: relative; padding: 1rem 1.5rem 0.5rem; display: inline-block; }
+    .trello-club-dropdown-btn {
+      display: flex; align-items: center; gap: 0.7rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border);
+      color: var(--text-main); padding: 0.7rem 1.1rem; border-radius: 12px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      min-width: 240px; justify-content: space-between; transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .trello-club-dropdown-btn:hover { border-color: var(--accent-solid); background: rgba(255,255,255,0.08); }
+    .trello-club-dropdown-btn .tcd-label { display: flex; align-items: center; gap: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trello-club-dropdown-btn .tcd-chevron { color: var(--text-muted); flex-shrink: 0; transition: transform 0.15s ease; }
+    .trello-club-dropdown-wrap.active .tcd-chevron { transform: rotate(180deg); }
+    .trello-club-dropdown-menu {
+      position: absolute; top: calc(100% + 2px); left: 1.5rem; background: #182238; border: 1px solid var(--card-border);
+      border-radius: 12px; width: 260px; max-height: 320px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 100; display: none; flex-direction: column; padding: 0.4rem; gap: 0.15rem;
+    }
+    .trello-club-dropdown-menu.active { display: flex; }
+    .trello-club-dropdown-item {
+      padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.86rem; font-weight: 600; color: var(--text-muted);
+      cursor: pointer; text-align: left; background: transparent; border: none; width: 100%;
+    }
+    .trello-club-dropdown-item:hover { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+    .trello-club-dropdown-item.active { background: var(--accent-gradient); color: white; }
     .kanban-card-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
     .kanban-card-tag { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
     .kanban-card-assignee { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.25rem; }
@@ -730,7 +749,13 @@
 
         <!-- ONGLET 2: TABLEAU KANBAN (TRELLO), organisé par club -->
         <div class="tab-content" id="tabBoard">
-          <div class="trello-club-tabs" id="trelloClubTabs"></div>
+          <div class="trello-club-dropdown-wrap" id="trelloClubDropdownWrap">
+            <button type="button" class="trello-club-dropdown-btn" id="trelloClubDropdownBtn" onclick="toggleTrelloClubDropdown(event)">
+              <span class="tcd-label"><i data-lucide="kanban" style="width:15px;"></i><span id="trelloClubDropdownLabel">Sélectionner un club</span></span>
+              <i data-lucide="chevron-down" class="tcd-chevron" style="width:16px;"></i>
+            </button>
+            <div class="trello-club-dropdown-menu" id="trelloClubTabs"></div>
+          </div>
           <div class="kanban-board" id="trelloBoardContainer">
             <!-- Les colonnes (À faire / En cours / Terminé) sont générées dynamiquement par club -->
           </div>
@@ -1911,6 +1936,11 @@
       const dropdown = document.getElementById('settingsDropdown');
       if (dropdown) dropdown.classList.remove('active');
 
+      const trelloWrap = document.getElementById('trelloClubDropdownWrap');
+      if (trelloWrap && !trelloWrap.contains(e.target)) {
+        closeTrelloClubDropdown();
+      }
+
       const clubWrapper = document.getElementById('clubSelectWrapper');
       const clubPanel = document.getElementById('clubSelectPanel');
       const clubTrigger = document.getElementById('clubSelectTrigger');
@@ -2683,8 +2713,36 @@
       const tabsEl = document.getElementById('trelloClubTabs');
       if (!tabsEl) return;
       tabsEl.innerHTML = trelloBoardsCache.map(b => `
-        <button class="trello-club-tab ${b.id === trelloActiveBoardId ? 'active' : ''}" onclick="switchTrelloBoard('${b.id}')">${escapeHtml(b.name)}</button>
+        <button class="trello-club-dropdown-item ${b.id === trelloActiveBoardId ? 'active' : ''}" onclick="selectTrelloClub('${b.id}')">${escapeHtml(b.name)}</button>
       `).join('');
+
+      const labelEl = document.getElementById('trelloClubDropdownLabel');
+      if (labelEl) {
+        const activeBoard = trelloBoardsCache.find(b => b.id === trelloActiveBoardId);
+        labelEl.textContent = activeBoard ? activeBoard.name : 'Sélectionner un club';
+      }
+    }
+
+    function toggleTrelloClubDropdown(e) {
+      if (e) e.stopPropagation();
+      const wrap = document.getElementById('trelloClubDropdownWrap');
+      const menu = document.getElementById('trelloClubTabs');
+      if (!wrap || !menu) return;
+      const isOpen = menu.classList.contains('active');
+      menu.classList.toggle('active', !isOpen);
+      wrap.classList.toggle('active', !isOpen);
+    }
+
+    function closeTrelloClubDropdown() {
+      const wrap = document.getElementById('trelloClubDropdownWrap');
+      const menu = document.getElementById('trelloClubTabs');
+      if (menu) menu.classList.remove('active');
+      if (wrap) wrap.classList.remove('active');
+    }
+
+    function selectTrelloClub(boardId) {
+      closeTrelloClubDropdown();
+      switchTrelloBoard(boardId);
     }
 
     async function switchTrelloBoard(boardId) {
