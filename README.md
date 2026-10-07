@@ -73,10 +73,8 @@ The main objectives of the project are:
 
 ### Home Page
 
-> Screenshot coming soon
 
 <img src="homepagecomplexe.png" alt="Home Page">
-
 
 ### Administration Dashboard
 
