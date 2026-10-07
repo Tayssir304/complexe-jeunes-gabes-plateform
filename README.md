@@ -73,8 +73,8 @@ The main objectives of the project are:
 
 ### Home Page
 
+<img width="1417" height="892" alt="image" src="https://github.com/user-attachments/assets/fa213bb1-ced5-4040-987b-9012772b6509" />
 
-<img src="homepagecomplexe.png" alt="Home Page">
 
 ### Administration Dashboard
 
