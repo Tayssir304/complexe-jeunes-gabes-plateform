@@ -75,9 +75,8 @@ The main objectives of the project are:
 
 > Screenshot coming soon
 
-<!-- Add your screenshot here:
-<img src="screenshots/home.png" alt="Home Page">
--->
+<img src="homepagecomplexe.png" alt="Home Page">
+
 
 ### Administration Dashboard
 
