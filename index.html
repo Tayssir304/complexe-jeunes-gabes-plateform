@@ -11,10 +11,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@1.27.0/dist/umd/lucide.min.js" integrity="sha384-iGjGimQxA1QCAbLRiSWPFc+KsjPW3kLS/2Cub+yRgYfd4EUEx/dxoJ0MKyEsbjop" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js" integrity="sha384-M65KxMm/JqBppck6onbmAgPVMBHrmPCf1L17Q+71EcvI9/VVI8j5cqoxQf6lj6h2" crossorigin="anonymous"></script>
+  <script src="config.js"></script>
   <script>
     // ==== Connexion Supabase ====
-    const SUPABASE_URL = "https://bdhxgzfqgsnbxdlfaycs.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaHhnemZxZ3NuYnhkbGZheWNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODI3NTAsImV4cCI6MjA5OTI1ODc1MH0.jBR9E5e_7cNIRRNjswOiH3oXMujiFes5nV7mRzq_LRE";
+    const SUPABASE_URL = "https://yztusoruolsikmnzxsjk.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dHVzb3J1b2xzaWttbnp4c2prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODUwODksImV4cCI6MjA5NTE2MTA4OX0.ofL8fbEGDOSmLqYGRWewwS1Kt_SEJKoTmONB4FVngUo";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Correspondance entre les noms de clubs affichés dans le formulaire et les clubs réels en base (table "boards")
@@ -454,6 +455,7 @@
       <ul class="nav-links">
         <li><a href="#clubs">Clubs</a></li>
         <li><a href="#inscription">Inscription</a></li>
+        <li><a href="admin.html">Administration</a></li>
       </ul>
       <div class="nav-actions">
         <button class="btn btn-secondary" onclick="openLoginModal()">Se connecter</button>
@@ -853,11 +855,8 @@
         <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Veuillez saisir le code secret d'administration.</p>
 
         <form onsubmit="verifyAdminLogin(event)">
-          <div class="form-group" style="margin-bottom:0.75rem;">
-            <input type="email" id="adminEmailInput" class="form-input" placeholder="Email administrateur" style="text-align:center; font-size:1rem;" autofocus required />
-          </div>
           <div class="form-group">
-            <input type="password" id="adminPasswordInput" class="form-input" placeholder="Mot de passe" style="text-align:center; font-size:1rem;" required />
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="Mot de passe administrateur" style="text-align:center; font-size:1rem;" autocomplete="current-password" autofocus required />
           </div>
           <p id="authError" style="color:var(--accent-red); font-size:0.8rem; display:none; margin-bottom:1rem;">Identifiants incorrects ou accès non autorisé.</p>
           <button type="submit" id="authSubmitBtn" class="btn btn-danger" style="width:100%;">Se connecter</button>
@@ -1624,7 +1623,7 @@
       
       const avatarEl = document.getElementById('userAvatar');
       if (currentUser.avatar) {
-        avatarEl.innerHTML = `<img src="${currentUser.avatar}" alt="Avatar" />`;
+        avatarEl.innerHTML = `<img src="${safeImgSrc(currentUser.avatar)}" alt="Avatar" />`;
       } else {
         avatarEl.innerText = currentUser.name.charAt(0).toUpperCase();
       }
@@ -1656,31 +1655,6 @@
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        // Vérification de l'email via Abstract API (Vercel Serverless Function)
-        if (submitBtn) submitBtn.textContent = 'Vérification de l\'email...';
-        let emailCheck = { valid: true };
-        try {
-          const verifyRes = await fetch('/api/verify-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-          });
-          emailCheck = await verifyRes.json();
-        } catch (verifyErr) {
-          console.error('Email verification request failed:', verifyErr);
-        }
-
-        if (emailCheck.valid === false) {
-          const reasons = {
-            disposable_email: "Les adresses email jetables/temporaires ne sont pas acceptées.",
-            undeliverable: "Cette adresse email n'existe pas ou n'est pas joignable.",
-            invalid_format: "Le format de l'adresse email est invalide."
-          };
-          alert(reasons[emailCheck.reason] || "Cette adresse email semble invalide ou inexistante. Merci d'utiliser une adresse email réelle.");
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "S'inscrire"; }
-          return;
-        }
-
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
           email, password,
           options: {
@@ -1737,7 +1711,10 @@
       } catch (err) {
         console.error(err);
         if (isRateLimitError(err)) {
-          alert("Trop de tentatives d'inscription depuis cet appareil. Veuillez patienter quelques minutes avant de réessayer.");
+          const emailLimit = err.code === 'over_email_send_rate_limit' || /email rate limit/i.test(err.message || '');
+          alert(emailLimit
+            ? "Limite d'envoi d'emails de confirmation atteinte (serveur). Réessayez dans environ une heure, ou contactez l'administrateur."
+            : "Trop de tentatives d'inscription depuis cet appareil. Veuillez patienter quelques minutes avant de réessayer.");
         } else {
           alert("Erreur lors de l'inscription : " + (err.message || err));
         }
@@ -1992,7 +1969,7 @@
       (currentUser.clubs || [currentUser.club]).forEach(cl => {
         const pill = document.createElement('span');
         pill.className = 'club-pill';
-        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${cl}`;
+        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${escapeHtml(cl)}`;
         clubsContainer.appendChild(pill);
       });
 
@@ -2091,7 +2068,11 @@
       userPics.forEach(imgUrl => {
         const item = document.createElement('div');
         item.className = 'insta-item';
-        item.innerHTML = `<img src="${imgUrl}" alt="Photo partagée" onclick="window.open('${imgUrl}', '_blank')" />`;
+        const img = document.createElement('img');
+        img.src = safeImgSrc(imgUrl) ? imgUrl : '';
+        img.alt = 'Photo partagée';
+        img.onclick = () => window.open(img.src, '_blank', 'noopener');
+        item.appendChild(img);
         grid.appendChild(item);
       });
     }
@@ -2114,7 +2095,7 @@
       const myClubs = currentUser.clubs || [currentUser.club || 'Développement Web'];
 
       select.innerHTML = `<option value="__all__">Tous mes clubs</option>` +
-        myClubs.map(cl => `<option value="${cl}">${cl}</option>`).join('');
+        myClubs.map(cl => `<option value="${escapeHtml(cl)}">${escapeHtml(cl)}</option>`).join('');
     }
 
     function handleMemberSearch() {
@@ -2145,10 +2126,10 @@
           const item = document.createElement('div');
           item.className = 'member-search-result-item';
           item.innerHTML = `
-            <div class="avatar" style="width:32px; height:32px; font-size:0.8rem;">${u.name.charAt(0).toUpperCase()}</div>
+            <div class="avatar" style="width:32px; height:32px; font-size:0.8rem;">${escapeHtml(u.name.charAt(0).toUpperCase())}</div>
             <div>
-              <div class="member-search-result-name">${u.name}</div>
-              <div class="member-search-result-meta">${u.role || 'Membre'} • ${uClubs.join(', ')}</div>
+              <div class="member-search-result-name">${escapeHtml(u.name)}</div>
+              <div class="member-search-result-meta">${escapeHtml(u.role || 'Membre')} • ${escapeHtml(uClubs.join(', '))}</div>
             </div>
           `;
           item.onclick = () => { openUserProfile(u.email); closeMemberSearchResults(); };
@@ -2184,7 +2165,7 @@
 
       const avatarEl = document.getElementById('viewProfileAvatar');
       if (user.avatar) {
-        avatarEl.innerHTML = `<img src="${user.avatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`;
+        avatarEl.innerHTML = `<img src="${safeImgSrc(user.avatar)}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`;
       } else {
         avatarEl.innerText = user.name.charAt(0).toUpperCase();
       }
@@ -2197,7 +2178,7 @@
       (user.clubs || [user.club]).forEach(cl => {
         const pill = document.createElement('span');
         pill.className = 'club-pill';
-        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${cl}`;
+        pill.innerHTML = `<i data-lucide="check-circle-2" style="width:14px;"></i> ${escapeHtml(cl)}`;
         clubsContainer.appendChild(pill);
       });
 
@@ -2232,7 +2213,7 @@
         const item = document.createElement('div');
         const hasUnread = !!unreadCounts[ch];
         item.className = `channel-item ${ch === currentChannel ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}`;
-        item.innerHTML = `<i data-lucide="hash" style="width:16px;"></i> ${ch}<span class="unread-dot"></span>`;
+        item.innerHTML = `<i data-lucide="hash" style="width:16px;"></i> ${escapeHtml(ch)}<span class="unread-dot"></span>`;
         item.onclick = () => switchChannel(ch, item);
         container.appendChild(item);
       });
@@ -2269,7 +2250,7 @@
         const item = document.createElement('div');
         const dmHasUnread = !!unreadCounts[channelId];
         item.className = `channel-item ${currentChannel === channelId ? 'active' : ''} ${dmHasUnread ? 'has-unread' : ''}`;
-        item.innerHTML = `<i data-lucide="user" style="width:16px;"></i> ${otherName}<span class="unread-dot"></span>`;
+        item.innerHTML = `<i data-lucide="user" style="width:16px;"></i> ${escapeHtml(otherName)}<span class="unread-dot"></span>`;
         item.onclick = () => switchChannel(channelId, item);
         dmContainer.appendChild(item);
       });
@@ -2316,6 +2297,13 @@
       renderChatMessages();
     }
 
+    // N'autorise que des images en data: ou http(s): (bloque javascript: etc.)
+    function safeImgSrc(src) {
+      if (!src) return '';
+      const v = String(src).trim();
+      return /^(data:image\/|https?:\/\/)/i.test(v) ? escapeHtml(v) : '';
+    }
+
     function isImageUrl(url) { return(url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null); }
 
     function getMessagesForCurrentChannel() {
@@ -2343,21 +2331,22 @@
         const isSelf = msg.authorEmail && msg.authorEmail === currentUser.email;
         const canViewProfile = !isAdmin && msg.authorEmail;
 
-        let imgHtml = msg.image ? `<img src="${msg.image}" class="chat-img-embed" />` : '';
+        const safeImg = safeImgSrc(msg.image);
+        let imgHtml = safeImg ? `<img src="${safeImg}" class="chat-img-embed" />` : '';
 
         const profileClickAttr = canViewProfile
-          ? `onclick="${isSelf ? 'openProfileModal()' : `openUserProfile('${msg.authorEmail}')`}"`
+          ? `onclick="${isSelf ? 'openProfileModal()' : `openUserProfile('${escapeHtml(msg.authorEmail).replace(/\\/g, '')}')`}"`
           : '';
 
         msgDiv.innerHTML = `
-          <div class="avatar ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr} style="${isAdmin ? 'background: linear-gradient(135deg, #ef4444, #f97316);' : ''}">${msg.author.charAt(0).toUpperCase()}</div>
+          <div class="avatar ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr} style="${isAdmin ? 'background: linear-gradient(135deg, #ef4444, #f97316);' : ''}">${escapeHtml((msg.author || '?').charAt(0).toUpperCase())}</div>
           <div class="chat-msg-body">
             <div class="chat-msg-header">
-              <span class="chat-msg-author ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr}>${msg.author}</span>
-              <span class="role-badge ${isAdmin ? 'admin' : ''}">${msg.role}</span>
+              <span class="chat-msg-author ${canViewProfile ? 'clickable-profile' : ''}" ${profileClickAttr}>${escapeHtml(msg.author)}</span>
+              <span class="role-badge ${isAdmin ? 'admin' : ''}">${escapeHtml(msg.role)}</span>
               ${canDelete ? `<button class="btn-del-msg" onclick="deleteUserMessage(${idx})" title="Supprimer le message"><i data-lucide="trash-2" style="width:14px;"></i></button>` : ''}
             </div>
-            <div>${msg.text}</div>
+            <div>${escapeHtml(msg.text)}</div>
             ${imgHtml}
           </div>
         `;
@@ -2637,7 +2626,7 @@
       currentLightboxPhoto = item;
       document.getElementById('lightboxImage').src = item.image;
       document.getElementById('lightboxDescription').innerText = item.description || 'Aucune description';
-      document.getElementById('lightboxAuthor').innerHTML = ` Par <strong>${item.author}</strong> • ${clubLabels[item.club] || item.club} • ${item.timestamp}`;
+      document.getElementById('lightboxAuthor').innerHTML = ` Par <strong>${escapeHtml(item.author)}</strong> • ${escapeHtml(clubLabels[item.club] || item.club)} • ${escapeHtml(item.timestamp)}`;
       document.getElementById('galleryLightbox').classList.add('open');
     }
 
@@ -3121,7 +3110,7 @@
       e.preventDefault();
       if (Date.now() < adminCooldownUntil) return;
 
-      const email = document.getElementById('adminEmailInput').value.trim();
+      const email = (window.CJG_CONFIG && window.CJG_CONFIG.ADMIN_EMAIL) || '';
       const password = document.getElementById('adminPasswordInput').value;
       const btn = document.getElementById('authSubmitBtn');
       const errEl = document.getElementById('authError');
@@ -3135,6 +3124,15 @@
         adminFailedAttempts++;
         if (isRateLimitError(error)) {
           startAdminCooldown(60);
+          return;
+        }
+        const isNetwork = error && (error.name === 'AuthRetryableFetchError' || error.status === 0 || /fetch|network/i.test(error.message || ''));
+        if (isNetwork) {
+          adminFailedAttempts = Math.max(0, adminFailedAttempts - 1);
+          errEl.textContent = "Impossible de joindre le serveur Supabase (réseau/DNS ou projet en pause).";
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
           return;
         }
         errEl.textContent = "Email ou mot de passe incorrect.";
@@ -3170,7 +3168,6 @@
     async function lockAdminSession() {
       await supabaseClient.auth.signOut();
       document.getElementById('lockOverlay').style.display = 'flex';
-      document.getElementById('adminEmailInput').value = '';
       document.getElementById('adminPasswordInput').value = '';
     }
 
@@ -3261,10 +3258,10 @@
 
         div.innerHTML = `
           <div>
-            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${msg.author} (${msg.role})</div>
-            <div style="font-size:0.88rem; margin-top:0.2rem;">${msg.text}</div>
+            <div style="font-size:0.75rem; color:${isAdmin ? '#f87171' : '#818cf8'}; font-weight:700;">${escapeHtml(msg.author)} (${escapeHtml(msg.role)})</div>
+            <div style="font-size:0.88rem; margin-top:0.2rem;">${escapeHtml(msg.text)}</div>
           </div>
-          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteDirectMsg('${email}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteDirectMsg('${escapeHtml(email)}', ${idx})"><i data-lucide="trash-2" style="width:14px;"></i></button>
         `;
         feed.appendChild(div);
       });
@@ -3372,11 +3369,11 @@
         const chClub = (sharedData.channelClubs && sharedData.channelClubs[ch]) || 'Tous';
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><strong># ${ch}</strong></td>
-          <td>${clubLabels[chClub] || chClub}</td>
+          <td><strong># ${escapeHtml(ch)}</strong></td>
+          <td>${escapeHtml(clubLabels[chClub] || chClub)}</td>
           <td>${count} message(s)</td>
           <td>
-            ${(ch !== 'general') ? `<button class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.75rem;" onclick="deleteChannel('${ch}')"><i data-lucide="trash-2" style="width:14px;"></i> Supprimer</button>` : '<span style="color:var(--text-muted); font-size:0.8rem;">Salon protégé</span>'}
+            ${(ch !== 'general') ? `<button class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.75rem;" onclick="deleteChannel('${escapeHtml(ch)}')"><i data-lucide="trash-2" style="width:14px;"></i> Supprimer</button>` : '<span style="color:var(--text-muted); font-size:0.8rem;">Salon protégé</span>'}
           </td>
         `;
         tbody.appendChild(tr);
@@ -3425,9 +3422,9 @@
         const card = document.createElement('div');
         card.className = 'media-card';
         card.innerHTML = `
-          <img src="${imgUrl}" alt="Media Admin" />
+          <img src="${safeImgSrc(imgUrl)}" alt="Media Admin" />
           <div class="media-info">
-            <button class="btn btn-secondary" style="padding:0.3rem 0.5rem;" onclick="window.open('${imgUrl}', '_blank')" title="Agrandir"><i data-lucide="external-link" style="width:14px;"></i></button>
+            <button class="btn btn-secondary" style="padding:0.3rem 0.5rem;" onclick="window.open(this.closest('.media-card').querySelector('img').src, '_blank', 'noopener')" title="Agrandir"><i data-lucide="external-link" style="width:14px;"></i></button>
             <button class="btn btn-danger" style="padding:0.3rem 0.5rem;" onclick="deleteAdminMedia(${idx})" title="Supprimer"><i data-lucide="trash-2" style="width:14px;"></i></button>
           </div>
         `;
@@ -3471,9 +3468,9 @@
         const clubsStr = (u.clubs || []).join(', ') || 'Non renseigné';
 
         tr.innerHTML = `
-          <td><strong>${u.full_name}</strong></td>
-          <td>${u.email || 'Non renseigné'}</td>
-          <td>${clubsStr}</td>
+          <td><strong>${escapeHtml(u.full_name)}</strong></td>
+          <td>${escapeHtml(u.email || 'Non renseigné')}</td>
+          <td>${escapeHtml(clubsStr)}</td>
           <td><span style="background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem;">Membre</span></td>
           <td>
             <span style="padding:0.2rem 0.6rem; border-radius:9999px; font-weight:700; font-size:0.75rem; background:${isPaid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${isPaid ? '#34d399' : '#f87171'};">

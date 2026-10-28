@@ -11,10 +11,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@1.27.0/dist/umd/lucide.min.js" integrity="sha384-iGjGimQxA1QCAbLRiSWPFc+KsjPW3kLS/2Cub+yRgYfd4EUEx/dxoJ0MKyEsbjop" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js" integrity="sha384-M65KxMm/JqBppck6onbmAgPVMBHrmPCf1L17Q+71EcvI9/VVI8j5cqoxQf6lj6h2" crossorigin="anonymous"></script>
+  <script src="config.js"></script>
   <script>
     // ==== Connexion Supabase (même projet que index.html) ====
-    const SUPABASE_URL = "https://bdhxgzfqgsnbxdlfaycs.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaHhnemZxZ3NuYnhkbGZheWNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODI3NTAsImV4cCI6MjA5OTI1ODc1MH0.jBR9E5e_7cNIRRNjswOiH3oXMujiFes5nV7mRzq_LRE";
+    const SUPABASE_URL = "https://yztusoruolsikmnzxsjk.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dHVzb3J1b2xzaWttbnp4c2prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODUwODksImV4cCI6MjA5NTE2MTA4OX0.ofL8fbEGDOSmLqYGRWewwS1Kt_SEJKoTmONB4FVngUo";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   </script>
 
@@ -210,11 +211,8 @@
       <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Veuillez saisir le code d'accès administrateur pour accéder à ce panneau.</p>
 
       <form onsubmit="verifyAdminLogin(event)">
-        <div class="form-group" style="margin-bottom:0.75rem;">
-          <input type="email" id="adminEmailInput" class="form-input" placeholder="Email administrateur" style="text-align:center; font-size:1rem;" autofocus required />
-        </div>
         <div class="form-group">
-          <input type="password" id="adminPasswordInput" class="form-input" placeholder="Mot de passe" style="text-align:center; font-size:1rem;" required />
+          <input type="password" id="adminPasswordInput" class="form-input" placeholder="Mot de passe administrateur" style="text-align:center; font-size:1rem;" autocomplete="current-password" autofocus required />
         </div>
         <p id="authError" style="color:var(--accent-red); font-size:0.8rem; display:none; margin-bottom:1rem;">Identifiants incorrects ou accès non autorisé.</p>
         <button type="submit" id="authSubmitBtn" class="btn btn-danger" style="width:100%;">Se connecter</button>
@@ -669,7 +667,7 @@
       e.preventDefault();
       if (Date.now() < adminCooldownUntil) return;
 
-      const email = document.getElementById('adminEmailInput').value.trim();
+      const email = (window.CJG_CONFIG && window.CJG_CONFIG.ADMIN_EMAIL) || '';
       const password = document.getElementById('adminPasswordInput').value;
       const btn = document.getElementById('authSubmitBtn');
       const errEl = document.getElementById('authError');
@@ -683,6 +681,15 @@
         adminFailedAttempts++;
         if (isRateLimitError(error)) {
           startAdminCooldown(60);
+          return;
+        }
+        const isNetwork = error && (error.name === 'AuthRetryableFetchError' || error.status === 0 || /fetch|network/i.test(error.message || ''));
+        if (isNetwork) {
+          adminFailedAttempts = Math.max(0, adminFailedAttempts - 1);
+          errEl.textContent = "Impossible de joindre le serveur Supabase (réseau/DNS ou projet en pause).";
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
           return;
         }
         errEl.textContent = "Email ou mot de passe incorrect.";
